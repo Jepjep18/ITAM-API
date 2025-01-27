@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IT_ASSET.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250125084627_update")]
-    partial class update
+    [Migration("20250127083021_AddComputerModel")]
+    partial class AddComputerModel
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -67,6 +67,10 @@ namespace IT_ASSET.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("hdd")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.PrimitiveCollection<string>("history")
                         .HasColumnType("nvarchar(max)");
 
@@ -104,7 +108,7 @@ namespace IT_ASSET.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("storage")
+                    b.Property<string>("ssd")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -123,6 +127,145 @@ namespace IT_ASSET.Migrations
                     b.HasIndex("owner_id");
 
                     b.ToTable("Assets");
+                });
+
+            modelBuilder.Entity("IT_ASSET.Models.Computer", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
+
+                    b.Property<string>("asset_barcode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("asset_image")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("brand")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("color")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("cost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("date_acquired")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("date_created")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("date_modified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("gpu")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("hdd")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.PrimitiveCollection<string>("history")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("is_deleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("li_description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("model")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("owner_id")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ownerid")
+                        .HasColumnType("int");
+
+                    b.Property<string>("po")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ram")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("remarks")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("serial_no")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("size")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ssd")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("warranty")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("ownerid");
+
+                    b.ToTable("computers");
+                });
+
+            modelBuilder.Entity("IT_ASSET.Models.ComputerComponents", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
+
+                    b.Property<string>("asset_barcode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.PrimitiveCollection<string>("history")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("owner_id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("status")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("owner_id");
+
+                    b.ToTable("computer_components");
                 });
 
             modelBuilder.Entity("IT_ASSET.Models.Logs.Asset_logs", b =>
@@ -275,6 +418,27 @@ namespace IT_ASSET.Migrations
                     b.Navigation("owner");
                 });
 
+            modelBuilder.Entity("IT_ASSET.Models.Computer", b =>
+                {
+                    b.HasOne("User", "owner")
+                        .WithMany()
+                        .HasForeignKey("ownerid")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("owner");
+                });
+
+            modelBuilder.Entity("IT_ASSET.Models.ComputerComponents", b =>
+                {
+                    b.HasOne("User", "owner")
+                        .WithMany("computer_components")
+                        .HasForeignKey("owner_id")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("owner");
+                });
+
             modelBuilder.Entity("IT_ASSET.Models.Logs.Asset_logs", b =>
                 {
                     b.HasOne("Asset", "assets")
@@ -316,6 +480,8 @@ namespace IT_ASSET.Migrations
             modelBuilder.Entity("User", b =>
                 {
                     b.Navigation("assets");
+
+                    b.Navigation("computer_components");
                 });
 #pragma warning restore 612, 618
         }

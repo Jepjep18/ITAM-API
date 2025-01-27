@@ -1,4 +1,6 @@
-﻿public class User
+﻿using IT_ASSET.Models;
+
+public class User
 {
     public int id { get; set; }
     public string name { get; set; } 
@@ -14,4 +16,8 @@
 
     // Navigation property for the relationship (one-to-many)
     public ICollection<Asset> assets { get; set; }
+    public ICollection<Computer> computer { get; set; }
+
+    public ICollection<ComputerComponents> computer_components { get; set; }
+
 }

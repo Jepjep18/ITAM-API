@@ -36,7 +36,8 @@ namespace IT_ASSET.Services.NewFolder
                 brand = assetDto.brand,
                 model = assetDto.model,
                 ram = assetDto.ram,
-                storage = assetDto.storage,
+                ssd = assetDto.ssd,
+                hdd = assetDto.hdd,
                 gpu = assetDto.gpu,
                 size = assetDto.size,
                 color = assetDto.color,
@@ -66,7 +67,8 @@ namespace IT_ASSET.Services.NewFolder
                 assetDto.type?.Trim(),
                 assetDto.model?.Trim(),
                 assetDto.ram?.Trim(),
-                assetDto.storage?.Trim(),
+                assetDto.ssd?.Trim(),
+                assetDto.hdd?.Trim(),
                 assetDto.gpu?.Trim(),
                 assetDto.size?.Trim(),
                 assetDto.color?.Trim()).Trim();
@@ -204,7 +206,8 @@ namespace IT_ASSET.Services.NewFolder
                 assetDto.type?.Trim(),
                 assetDto.model?.Trim(),
                 assetDto.ram?.Trim(),
-                assetDto.storage?.Trim(),
+                assetDto.ssd?.Trim(),
+                assetDto.hdd?.Trim(),
                 assetDto.gpu?.Trim(),
                 assetDto.size?.Trim(),
                 assetDto.color?.Trim()).Trim();
@@ -222,7 +225,8 @@ namespace IT_ASSET.Services.NewFolder
                 brand = assetDto.brand,
                 model = assetDto.model,
                 ram = assetDto.ram,
-                storage = assetDto.storage,
+                ssd = assetDto.ssd,
+                hdd = assetDto.hdd,
                 gpu = assetDto.gpu,
                 size = assetDto.size,
                 color = assetDto.color,
@@ -417,7 +421,8 @@ namespace IT_ASSET.Services.NewFolder
                 assetDto.type?.Trim(),
                 assetDto.model?.Trim(),
                 assetDto.ram?.Trim(),
-                assetDto.storage?.Trim(),
+                assetDto.ssd?.Trim(),
+                assetDto.hdd?.Trim(),
                 assetDto.gpu?.Trim(),
                 assetDto.size?.Trim(),
                 assetDto.color?.Trim()).Trim();
@@ -428,7 +433,8 @@ namespace IT_ASSET.Services.NewFolder
             asset.brand = assetDto.brand;
             asset.model = assetDto.model;
             asset.ram = assetDto.ram;
-            asset.storage = assetDto.storage;
+            asset.ssd = assetDto.ssd;
+            asset.hdd = assetDto.hdd;
             asset.gpu = assetDto.gpu;
             asset.size = assetDto.size;
             asset.color = assetDto.color;

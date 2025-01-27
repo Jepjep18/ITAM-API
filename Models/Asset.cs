@@ -9,7 +9,9 @@ public class Asset
     public string brand { get; set; }
     public string model { get; set; }
     public string ram { get; set; }
-    public string storage { get; set; }
+    public string ssd { get; set; }
+    public string hdd { get; set; }
+
     public string gpu { get; set; }
     public string size { get; set; }
     public string color { get; set; }
