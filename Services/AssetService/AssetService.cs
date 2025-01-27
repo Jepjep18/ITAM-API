@@ -194,5 +194,56 @@ namespace IT_ASSET.Services.NewFolder
 
             return filePath;
         }
+
+        //for create-vacant-asset endpoint 
+        public async Task<Asset> CreateVacantAssetAsync(CreateAssetDto assetDto)
+        {
+            // Validate and prepare the li_description
+            var liDescription = string.Join(" ",
+                assetDto.brand?.Trim(),
+                assetDto.type?.Trim(),
+                assetDto.model?.Trim(),
+                assetDto.ram?.Trim(),
+                assetDto.storage?.Trim(),
+                assetDto.gpu?.Trim(),
+                assetDto.size?.Trim(),
+                assetDto.color?.Trim()).Trim();
+
+            if (string.IsNullOrWhiteSpace(liDescription))
+            {
+                liDescription = "No description available"; // Default value
+            }
+
+            // Create a new Asset object
+            var asset = new Asset
+            {
+                type = assetDto.type,
+                asset_barcode = assetDto.asset_barcode,
+                brand = assetDto.brand,
+                model = assetDto.model,
+                ram = assetDto.ram,
+                storage = assetDto.storage,
+                gpu = assetDto.gpu,
+                size = assetDto.size,
+                color = assetDto.color,
+                serial_no = assetDto.serial_no,
+                po = assetDto.po,
+                warranty = assetDto.warranty,
+                cost = assetDto.cost,
+                remarks = assetDto.remarks,
+                li_description = liDescription,
+                date_acquired = assetDto.date_acquired,
+                asset_image = assetDto.asset_image,
+                owner_id = null,
+                history = new List<string>(),
+                date_created = DateTime.UtcNow
+            };
+
+            // Add the asset to the database
+            _context.Assets.Add(asset);
+            await _context.SaveChangesAsync();
+
+            return asset;
+        }
     }
 }

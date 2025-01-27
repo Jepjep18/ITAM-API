@@ -135,44 +135,19 @@ public class AssetsController : ControllerBase
             return BadRequest("Invalid asset data.");
         }
 
-        var asset = new Asset
+        try
         {
-            type = assetDto.type,
-            asset_barcode = assetDto.asset_barcode,
-            brand = assetDto.brand,
-            model = assetDto.model,
-            ram = assetDto.ram,
-            storage = assetDto.storage,
-            gpu = assetDto.gpu,
-            size = assetDto.size,
-            color = assetDto.color,
-            serial_no = assetDto.serial_no,
-            po = assetDto.po,
-            warranty = assetDto.warranty,
-            cost = assetDto.cost,
-            remarks = assetDto.remarks,
-            li_description = string.Join(" ",
-                assetDto.brand?.Trim(),
-                assetDto.type?.Trim(),
-                assetDto.model?.Trim(),
-                assetDto.ram?.Trim(),
-                assetDto.storage?.Trim(),
-                assetDto.gpu?.Trim(),
-                assetDto.size?.Trim(),
-                assetDto.color?.Trim()).Trim(),
-            date_acquired = assetDto.date_acquired,
-            asset_image = assetDto.asset_image,
-            owner_id = null,
-            history = new List<string>(),
+            // Call the service to create the vacant asset
+            var asset = await _assetService.CreateVacantAssetAsync(assetDto);
 
-            date_created = DateTime.UtcNow 
-        };
-
-        _context.Assets.Add(asset);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Asset created successfully.", asset });
+            return Ok(new { message = "Asset created successfully.", asset });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error creating asset: {ex.Message}");
+        }
     }
+
 
 
 
