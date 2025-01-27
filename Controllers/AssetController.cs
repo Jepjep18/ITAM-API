@@ -80,52 +80,28 @@ public class AssetsController : ControllerBase
 
 
     [HttpPost("upload-image/{assetId}")]
-        public async Task<IActionResult> UploadAssetImage(int assetId, IFormFile assetImage)
+    public async Task<IActionResult> UploadAssetImage(int assetId, IFormFile assetImage)
+    {
+        if (assetImage == null || assetImage.Length == 0)
         {
-            if (assetImage == null || assetImage.Length == 0)
-            {
-                return BadRequest("No file uploaded.");
-            }
-
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-            var fileExtension = Path.GetExtension(assetImage.FileName).ToLower();
-
-            if (!allowedExtensions.Contains(fileExtension))
-            {
-                return BadRequest("Invalid file type. Only images are allowed.");
-            }
-
-            var asset = await _context.Assets.FindAsync(assetId);
-            if (asset == null)
-            {
-                return NotFound("Asset not found.");
-            }
-
-            var fileName = $"{assetId}_{Path.GetFileName(assetImage.FileName)}";
-
-            var directoryPath = @"C:\Users\JBARNADO\Desktop\ITAM\asset_image";
-
-            var filePath = Path.Combine(directoryPath, fileName);
-
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await assetImage.CopyToAsync(stream);
-            }
-
-            asset.asset_image = filePath;
-
-            _context.Assets.Update(asset);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Image uploaded successfully.", filePath = filePath });
+            return BadRequest("No file uploaded.");
         }
 
-        [HttpPost("assign-owner")]
+        try
+        {
+            // Call the service to handle the image upload
+            var filePath = await _assetService.UploadAssetImageAsync(assetId, assetImage);
+
+            return Ok(new { message = "Image uploaded successfully.", filePath });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error uploading image: {ex.Message}");
+        }
+    }
+
+
+    [HttpPost("assign-owner")]
         public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
         {
             var asset = await _context.Assets

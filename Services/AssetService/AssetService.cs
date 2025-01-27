@@ -148,5 +148,51 @@ namespace IT_ASSET.Services.NewFolder
 
             return $"TRID-{nextCode:D4}";
         }
+
+
+        //for upload image endpoint 
+        public async Task<string> UploadAssetImageAsync(int assetId, IFormFile assetImage)
+        {
+            // Allowed file extensions for images
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+            var fileExtension = Path.GetExtension(assetImage.FileName).ToLower();
+
+            // Check if the file extension is allowed
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                throw new ArgumentException("Invalid file type. Only images are allowed.");
+            }
+
+            // Find the asset in the database
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null)
+            {
+                throw new KeyNotFoundException("Asset not found.");
+            }
+
+            // Construct the file name and path
+            var fileName = $"{assetId}_{Path.GetFileName(assetImage.FileName)}";
+            var directoryPath = @"C:\Users\JBARNADO\Desktop\ITAM\asset_image";
+            var filePath = Path.Combine(directoryPath, fileName);
+
+            // Create the directory if it doesn't exist
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            // Save the image to the directory
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await assetImage.CopyToAsync(stream);
+            }
+
+            // Update the asset with the file path
+            asset.asset_image = filePath;
+            _context.Assets.Update(asset);
+            await _context.SaveChangesAsync();
+
+            return filePath;
+        }
     }
 }
