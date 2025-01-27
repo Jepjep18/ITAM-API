@@ -16,13 +16,17 @@ public class AssetsController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly AssetImportService _assetImportService;
+    private readonly AssetService _assetService;
+    private readonly UserService _userService;
 
 
 
-    public AssetsController(AppDbContext context , AssetImportService assetImportService)
+    public AssetsController(AppDbContext context , AssetImportService assetImportService, AssetService assetService, UserService userService)
     {
         _context = context;
         _assetImportService = assetImportService;
+        _assetService = assetService;
+        _userService = userService;
 
     }
 
@@ -50,14 +54,6 @@ public class AssetsController : ControllerBase
 
 
 
-
-
-
-
-
-
-
-
     [HttpPost("add-asset")]
     public async Task<IActionResult> AddAsset([FromBody] AddAssetDto assetDto)
     {
@@ -66,133 +62,17 @@ public class AssetsController : ControllerBase
             return BadRequest("Invalid data.");
         }
 
-        // Find or create the user
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.name == assetDto.user_name && u.company == assetDto.company && u.department == assetDto.department);
-
-        if (user == null)
+        try
         {
-            user = new User
-            {
-                name = assetDto.user_name,
-                company = assetDto.company,
-                department = assetDto.department,
-                employee_id = assetDto.employee_id
-            };
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            // Call the service to handle adding the asset
+            var result = await _assetService.AddAssetAsync(assetDto);
+
+            return Ok(result); // Return the success message
         }
-        else
+        catch (Exception ex)
         {
-            if (!string.IsNullOrWhiteSpace(assetDto.employee_id) && user.employee_id != assetDto.employee_id)
-            {
-                user.employee_id = assetDto.employee_id;
-                _context.Users.Update(user);
-                await _context.SaveChangesAsync();
-            }
+            return BadRequest($"Error adding asset: {ex.Message}");
         }
-
-        // Generate li_description
-        var liDescription = string.Join(" ",
-            assetDto.brand?.Trim(),
-            assetDto.type?.Trim(),
-            assetDto.model?.Trim(),
-            assetDto.ram?.Trim(),
-            assetDto.storage?.Trim(),
-            assetDto.gpu?.Trim(),
-            assetDto.size?.Trim(),
-            assetDto.color?.Trim()).Trim();
-
-        if (string.IsNullOrWhiteSpace(liDescription))
-        {
-            liDescription = "No description available"; // Default value
-        }
-
-        // Create and save the asset
-        var asset = new Asset
-        {
-            type = assetDto.type,
-            date_acquired = assetDto.date_acquired,
-            asset_barcode = assetDto.asset_barcode,
-            brand = assetDto.brand,
-            model = assetDto.model,
-            ram = assetDto.ram,
-            storage = assetDto.storage,
-            gpu = assetDto.gpu,
-            size = assetDto.size,
-            color = assetDto.color,
-            serial_no = assetDto.serial_no,
-            po = assetDto.po,
-            warranty = assetDto.warranty,
-            cost = assetDto.cost,
-            remarks = assetDto.remarks,
-            owner_id = user.id,
-            li_description = liDescription,
-            date_created = DateTime.UtcNow
-        };
-
-        _context.Assets.Add(asset);
-        await _context.SaveChangesAsync();
-
-        // Add or update user accountability list
-        var userAccountabilityList = await _context.user_accountability_lists
-            .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
-
-        if (userAccountabilityList == null)
-        {
-            // Generate new accountability and tracking codes
-            var lastAccountabilityCode = _context.user_accountability_lists
-                .OrderByDescending(ual => ual.accountability_code)
-                .Select(ual => ual.accountability_code)
-                .FirstOrDefault();
-
-            int accountabilityCodeCounter = 1;
-            if (!string.IsNullOrEmpty(lastAccountabilityCode))
-            {
-                var lastNumber = lastAccountabilityCode.Substring(lastAccountabilityCode.LastIndexOf('-') + 1);
-                if (int.TryParse(lastNumber, out var lastNumberParsed))
-                {
-                    accountabilityCodeCounter = lastNumberParsed + 1;
-                }
-            }
-
-            var lastTrackingCode = _context.user_accountability_lists
-                .OrderByDescending(ual => ual.tracking_code)
-                .Select(ual => ual.tracking_code)
-                .FirstOrDefault();
-
-            int trackingCodeCounter = 1;
-            if (!string.IsNullOrEmpty(lastTrackingCode))
-            {
-                var lastNumber = lastTrackingCode.Substring(lastTrackingCode.LastIndexOf('-') + 1);
-                if (int.TryParse(lastNumber, out var lastNumberParsed))
-                {
-                    trackingCodeCounter = lastNumberParsed + 1;
-                }
-            }
-
-            // Create a new accountability list entry
-            userAccountabilityList = new UserAccountabilityList
-            {
-                accountability_code = $"ACID-{accountabilityCodeCounter:D4}",
-                tracking_code = $"TRID-{trackingCodeCounter:D4}",
-                owner_id = user.id,
-                asset_ids = asset.id.ToString()
-            };
-            _context.user_accountability_lists.Add(userAccountabilityList);
-        }
-        else
-        {
-            // Update existing accountability list with new asset ID
-            var existingAssetIds = userAccountabilityList.asset_ids.Split(',').Select(int.Parse).ToList();
-            existingAssetIds.Add(asset.id);
-            userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
-            _context.user_accountability_lists.Update(userAccountabilityList);
-        }
-
-        await _context.SaveChangesAsync();
-
-        return Ok("Asset added successfully.");
     }
 
 

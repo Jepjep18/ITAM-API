@@ -14,6 +14,8 @@ builder.Services.AddControllers();
 //builder.Services.AddScoped<IAssetService, AssetService>();
 //builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<AssetImportService>();
+builder.Services.AddScoped<AssetService>();
+builder.Services.AddScoped<UserService>();
 
 
 
