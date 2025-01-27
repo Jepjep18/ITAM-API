@@ -43,5 +43,37 @@ namespace IT_ASSET.Services.NewFolder
 
             return user;
         }
+
+        //for updating asset endpoint or creating new user for not existing user
+        public async Task<int> GetOrCreateUserAsync(UpdateAssetDto assetDto)
+        {
+            // Check if the user already exists
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.name == assetDto.user_name
+                                       && u.company == assetDto.company
+                                       && u.department == assetDto.department
+                                       && u.employee_id == assetDto.employee_id);
+
+            if (existingUser != null)
+            {
+                return existingUser.id; // Return the existing user's id
+            }
+            else
+            {
+                // Create a new user if not found
+                var newUser = new User
+                {
+                    name = assetDto.user_name,
+                    company = assetDto.company,
+                    department = assetDto.department,
+                    employee_id = assetDto.employee_id
+                };
+
+                _context.Users.Add(newUser);
+                await _context.SaveChangesAsync();
+
+                return newUser.id; // Return the new user's id
+            }
+        }
     }
 }

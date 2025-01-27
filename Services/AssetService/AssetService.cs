@@ -245,5 +245,206 @@ namespace IT_ASSET.Services.NewFolder
 
             return asset;
         }
+
+
+        //for get by type endpoint 
+        public async Task<PaginatedResponse<Asset>> GetAssetsByTypeAsync(
+            string type,
+            int pageNumber = 1,
+            int pageSize = 10,
+            string sortOrder = "asc",
+            string? searchTerm = null)
+        {
+            var query = _context.Assets
+                .Where(a => a.type.ToLower() == type.ToLower())
+                .AsQueryable();
+
+            // Apply search filter if provided
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(asset =>
+                    asset.asset_barcode.Contains(searchTerm) ||
+                    asset.type.Contains(searchTerm) ||
+                    asset.brand.Contains(searchTerm));
+            }
+
+            // Apply sorting based on the order
+            query = sortOrder.ToLower() switch
+            {
+                "desc" => query.OrderByDescending(asset => asset.id),
+                "asc" or _ => query.OrderBy(asset => asset.id),
+            };
+
+            // Get the total count of the filtered and sorted assets
+            var totalItems = await query.CountAsync();
+
+            // Apply pagination (skip and take)
+            var paginatedData = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            // Return the paginated response
+            return new PaginatedResponse<Asset>
+            {
+                Items = paginatedData,
+                TotalItems = totalItems,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
+
+        //for get all items endpoint 
+        public async Task<PaginatedResponse<Asset>> GetAllAssetsAsync(
+            int pageNumber = 1,
+            int pageSize = 10,
+            string sortOrder = "asc",
+            string? searchTerm = null)
+        {
+            var query = _context.Assets.AsQueryable();
+
+            // Apply search filter if provided
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(asset =>
+                    asset.asset_barcode.Contains(searchTerm) ||
+                    asset.type.Contains(searchTerm) ||
+                    asset.brand.Contains(searchTerm));
+            }
+
+            // Apply sorting based on the order
+            query = sortOrder.ToLower() switch
+            {
+                "desc" => query.OrderByDescending(asset => asset.id),
+                "asc" or _ => query.OrderBy(asset => asset.id),
+            };
+
+            // Get the total count of the filtered and sorted assets
+            var totalItems = await query.CountAsync();
+
+            // Apply pagination (skip and take)
+            var paginatedData = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            // Return the paginated response
+            return new PaginatedResponse<Asset>
+            {
+                Items = paginatedData,
+                TotalItems = totalItems,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
+
+        //for update endpoint 
+        public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId)
+        {
+            // Fetch the asset from the database
+            var asset = await _context.Assets.FirstOrDefaultAsync(a => a.id == assetId);
+
+            if (asset == null)
+            {
+                return null; // Asset not found
+            }
+
+            // Maintain history if the owner is changing
+            if (asset.owner_id != ownerId)
+            {
+                // Ensure that the history list is initialized
+                if (asset.history == null)
+                {
+                    asset.history = new List<string>();
+                }
+
+                // Fetch previous owner details
+                var previousOwnerName = await _context.Users
+                    .Where(u => u.id == asset.owner_id)
+                    .Select(u => u.name)
+                    .FirstOrDefaultAsync();
+
+                string previousOwner = previousOwnerName ?? "Unknown";
+                string newHistoryEntry = $"{previousOwner}";
+
+                // Add new entry to history
+                asset.history.Add(newHistoryEntry);
+
+                // Ensure accountability list is initialized for the new owner
+                var ownerAccountability = await _context.user_accountability_lists
+                    .FirstOrDefaultAsync(al => al.owner_id == ownerId);
+
+                if (ownerAccountability == null)
+                {
+                    // Create new accountability list if not exists
+                    var newAccountabilityList = new UserAccountabilityList
+                    {
+                        owner_id = ownerId,
+                        asset_ids = asset.id.ToString(), // Ensure it's in a format that you need (string)
+                        assets = new List<Asset> { asset } // Add asset to the list
+                    };
+
+                    _context.user_accountability_lists.Add(newAccountabilityList);
+                }
+                else
+                {
+                    // Ensure asset_ids is not null or empty
+                    if (string.IsNullOrWhiteSpace(ownerAccountability.asset_ids))
+                    {
+                        ownerAccountability.asset_ids = asset.id.ToString(); // Initialize if empty
+                    }
+                    else
+                    {
+                        ownerAccountability.asset_ids += "," + asset.id.ToString(); // Add asset ID as comma-separated value
+                    }
+
+                    // Ensure assets collection is initialized
+                    if (ownerAccountability.assets == null)
+                    {
+                        ownerAccountability.assets = new List<Asset>();
+                    }
+
+                    // Add asset to the existing user's accountability list
+                    ownerAccountability.assets.Add(asset);
+
+                    _context.user_accountability_lists.Update(ownerAccountability);
+                }
+            }
+
+            // Update asset details
+            asset.li_description = string.Join(" ",
+                assetDto.brand?.Trim(),
+                assetDto.type?.Trim(),
+                assetDto.model?.Trim(),
+                assetDto.ram?.Trim(),
+                assetDto.storage?.Trim(),
+                assetDto.gpu?.Trim(),
+                assetDto.size?.Trim(),
+                assetDto.color?.Trim()).Trim();
+
+            asset.type = assetDto.type;
+            asset.date_acquired = assetDto.date_acquired;
+            asset.asset_barcode = assetDto.asset_barcode;
+            asset.brand = assetDto.brand;
+            asset.model = assetDto.model;
+            asset.ram = assetDto.ram;
+            asset.storage = assetDto.storage;
+            asset.gpu = assetDto.gpu;
+            asset.size = assetDto.size;
+            asset.color = assetDto.color;
+            asset.serial_no = assetDto.serial_no;
+            asset.po = assetDto.po;
+            asset.warranty = assetDto.warranty;
+            asset.cost = assetDto.cost;
+            asset.remarks = assetDto.remarks;
+            asset.owner_id = ownerId;
+
+            _context.Assets.Update(asset);
+            await _context.SaveChangesAsync();
+
+            return asset; // Return updated asset
+        }
+
+
     }
 }

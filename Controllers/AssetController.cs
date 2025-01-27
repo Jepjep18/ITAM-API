@@ -152,7 +152,7 @@ public class AssetsController : ControllerBase
 
 
 
-    [HttpGet("owner/{owner_id}")]
+        [HttpGet("owner/{owner_id}")]
         public async Task<IActionResult> GetAssetsByOwnerId(int owner_id)
         {
         
@@ -171,97 +171,62 @@ public class AssetsController : ControllerBase
         }
 
 
-        [HttpGet("type/{type}")]
-        public async Task<IActionResult> GetAssetsByType(
+    [HttpGet("type/{type}")]
+    public async Task<IActionResult> GetAssetsByType(
         string type,
         int pageNumber = 1,
         int pageSize = 10,
         string sortOrder = "asc",
         string? searchTerm = null)
+    {
+        try
         {
-            var query = _context.Assets
-                .Where(a => a.type.ToLower() == type.ToLower())
-                .AsQueryable();
+            // Delegate the logic to the AssetService
+            var response = await _assetService.GetAssetsByTypeAsync(
+                type, pageNumber, pageSize, sortOrder, searchTerm);
 
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                query = query.Where(asset =>
-                    asset.asset_barcode.Contains(searchTerm) ||
-                    asset.type.Contains(searchTerm) ||
-                    asset.brand.Contains(searchTerm));
-            }
-
-            query = sortOrder.ToLower() switch
-            {
-                "desc" => query.OrderByDescending(asset => asset.id),
-                "asc" or _ => query.OrderBy(asset => asset.id),
-            };
-
-            var totalItems = await query.CountAsync();
-
-            var paginatedData = await query
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            if (!paginatedData.Any())
+            if (response == null || !response.Items.Any())
             {
                 return NotFound(new { message = $"No assets found for type: {type}." });
             }
 
-            var response = new PaginatedResponse<Asset>
-            {
-                Items = paginatedData,
-                TotalItems = totalItems,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            };
-
             return Ok(response);
         }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error retrieving assets: {ex.Message}");
+        }
+    }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllAssets(
+
+    [HttpGet]
+    public async Task<IActionResult> GetAllAssets(
         int pageNumber = 1,
         int pageSize = 10,
         string sortOrder = "asc",
         string? searchTerm = null)
         {
-            var query = _context.Assets.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(searchTerm))
+            try
             {
-                query = query.Where(asset =>
-                    asset.asset_barcode.Contains(searchTerm) ||
-                    asset.type.Contains(searchTerm) ||
-                    asset.brand.Contains(searchTerm));
+                // Delegate the logic to the AssetService
+                var response = await _assetService.GetAllAssetsAsync(pageNumber, pageSize, sortOrder, searchTerm);
+
+                if (response == null || !response.Items.Any())
+                {
+                    return NotFound(new { message = "No assets found." });
+                }
+
+                return Ok(response);
             }
-
-            query = sortOrder.ToLower() switch
+            catch (Exception ex)
             {
-                "desc" => query.OrderByDescending(asset => asset.id),
-                "asc" or _ => query.OrderBy(asset => asset.id),
-            };
-
-            var totalItems = await query.CountAsync();
-            var paginatedData = await query
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            var response = new PaginatedResponse<Asset>
-            {
-                Items = paginatedData,
-                TotalItems = totalItems,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            };
-
-            return Ok(response);
+                return BadRequest($"Error retrieving assets: {ex.Message}");
+            }
         }
 
 
-        [HttpGet("vacant")]
+
+    [HttpGet("vacant")]
         public async Task<IActionResult> GetVacantAssets()
         {
             var vacantAssets = await _context.Assets
@@ -284,92 +249,28 @@ public class AssetsController : ControllerBase
             return BadRequest("Invalid data.");
         }
 
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.name == assetDto.user_name
-                                   && u.company == assetDto.company
-                                   && u.department == assetDto.department
-                                   && u.employee_id == assetDto.employee_id);
+        try
+        {
+            // Step 1: Delegate user handling logic to UserService
+            var ownerId = await _userService.GetOrCreateUserAsync(assetDto);
 
-        int ownerId;
-        if (existingUser != null)
-        {
-            ownerId = existingUser.id;  
-        }
-        else
-        {
-            var newUser = new User
+            // Step 2: Delegate asset update logic to AssetService
+            var updatedAsset = await _assetService.UpdateAssetAsync(asset_id, assetDto, ownerId);
+
+            if (updatedAsset == null)
             {
-                name = assetDto.user_name,  
-                company = assetDto.company,
-                department = assetDto.department,
-                employee_id = assetDto.employee_id
-            };
-
-            _context.Users.Add(newUser);
-            await _context.SaveChangesAsync();
-
-            ownerId = newUser.id;
-        }
-
-        var asset = await _context.Assets
-            .FirstOrDefaultAsync(a => a.id == asset_id);
-
-        if (asset == null)
-        {
-            return NotFound(new { message = "Asset not found." });
-        }
-
-        if (asset.owner_id != ownerId)
-        {
-            if (asset.history == null)
-            {
-                asset.history = new List<string>();
+                return NotFound(new { message = "Asset not found." });
             }
 
-            var previousOwnerName = await _context.Users
-                .Where(u => u.id == asset.owner_id)
-                .Select(u => u.name)
-                .FirstOrDefaultAsync();
-
-            string previousOwner = previousOwnerName ?? "Unknown";
-
-            string newHistoryEntry = $"{previousOwner}";
-
-            asset.history.Add(newHistoryEntry);
+            return Ok(new { message = "Asset updated successfully.", asset = updatedAsset });
         }
-
-        asset.li_description = string.Join(" ",
-            assetDto.brand?.Trim(),
-            assetDto.type?.Trim(),
-            assetDto.model?.Trim(),
-            assetDto.ram?.Trim(),
-            assetDto.storage?.Trim(),
-            assetDto.gpu?.Trim(),
-            assetDto.size?.Trim(),
-            assetDto.color?.Trim()).Trim();
-
-            asset.type = assetDto.type;
-            asset.date_acquired = assetDto.date_acquired;
-            asset.asset_barcode = assetDto.asset_barcode;
-            asset.brand = assetDto.brand;
-            asset.model = assetDto.model;
-            asset.ram = assetDto.ram;
-            asset.storage = assetDto.storage;
-            asset.gpu = assetDto.gpu;
-            asset.size = assetDto.size;
-            asset.color = assetDto.color;
-            asset.serial_no = assetDto.serial_no;
-            asset.po = assetDto.po;
-            asset.warranty = assetDto.warranty;
-            asset.cost = assetDto.cost;
-            asset.remarks = assetDto.remarks;
-            asset.owner_id = ownerId;    
-
-            _context.Assets.Update(asset);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Asset updated successfully.", asset });
+        catch (Exception ex)
+        {
+            return BadRequest($"Error updating asset: {ex.Message}");
         }
+    }
+
+
 
     [HttpDelete("delete-asset/{id}")]
     public async Task<IActionResult> DeleteAsset(int id)
