@@ -62,9 +62,15 @@ namespace IT_ASSET.Services.NewFolder
                     _context.Assets.Add(asset);
                     await _context.SaveChangesAsync();
 
+                    // Log the asset creation
+                    await LogAssetActionAsync(asset, "Asset Imported", user.id, $"Asset imported with barcode {asset.asset_barcode}.");
+
                     // Update user accountability list and get updated counters
                     var (updatedAccountabilityCodeCounter, updatedTrackingCodeCounter) =
                         await UpdateUserAccountabilityListAsync(user, asset, accountabilityCodeCounter, trackingCodeCounter);
+
+                    // Log the user accountability update
+                    await LogUserActionAsync(user, "User Accountability Updated", user.id, $"Asset {asset.id} assigned to user {user.name}.");
 
                     // Update the counters after the method call
                     accountabilityCodeCounter = updatedAccountabilityCodeCounter;
@@ -73,6 +79,36 @@ namespace IT_ASSET.Services.NewFolder
             }
 
             return "Assets imported successfully.";
+        }
+
+        private async Task LogAssetActionAsync(Asset asset, string action, int performedByUserId, string details)
+        {
+            var log = new Asset_logs
+            {
+                asset_id = asset.id,
+                action = action,
+                performed_by_user_id = performedByUserId.ToString(),
+                timestamp = DateTime.UtcNow,
+                details = details
+            };
+
+            _context.asset_Logs.Add(log);
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task LogUserActionAsync(User user, string action, int performedByUserId, string details)
+        {
+            var log = new User_logs
+            {
+                user_id = user.id,
+                action = action,
+                performed_by_user_id = performedByUserId.ToString(),
+                timestamp = DateTime.UtcNow,
+                details = details
+            };
+
+            _context.user_logs.Add(log);
+            await _context.SaveChangesAsync();
         }
 
         private int GetNextCodeCounter(string column, string prefix)
@@ -134,15 +170,15 @@ namespace IT_ASSET.Services.NewFolder
         {
             var descriptionParts = new[]
             {
-                worksheet.Cells[row, 7].Text?.Trim(),
-                worksheet.Cells[row, 4].Text?.Trim(),
-                worksheet.Cells[row, 8].Text?.Trim(),
-                worksheet.Cells[row, 9].Text?.Trim(),
-                worksheet.Cells[row, 10].Text?.Trim(),
-                worksheet.Cells[row, 11].Text?.Trim(),
-                worksheet.Cells[row, 12].Text?.Trim(),
-                worksheet.Cells[row, 13].Text?.Trim()
-            };
+        worksheet.Cells[row, 7].Text?.Trim(),
+        worksheet.Cells[row, 4].Text?.Trim(),
+        worksheet.Cells[row, 8].Text?.Trim(),
+        worksheet.Cells[row, 9].Text?.Trim(),
+        worksheet.Cells[row, 10].Text?.Trim(),
+        worksheet.Cells[row, 11].Text?.Trim(),
+        worksheet.Cells[row, 12].Text?.Trim(),
+        worksheet.Cells[row, 13].Text?.Trim()
+    };
 
             return string.Join(" ", descriptionParts.Where(part => !string.IsNullOrWhiteSpace(part))).Trim()
                 ?? "No description available";
@@ -179,5 +215,6 @@ namespace IT_ASSET.Services.NewFolder
 
             return (accountabilityCodeCounter, trackingCodeCounter);
         }
+
     }
 }
