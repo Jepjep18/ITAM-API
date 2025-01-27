@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IT_ASSET.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250125081612_modifyDataType")]
+    partial class modifyDataType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -28,9 +31,6 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
-
-                    b.Property<int?>("UserAccountabilityListid")
-                        .HasColumnType("int");
 
                     b.Property<string>("asset_barcode")
                         .IsRequired()
@@ -115,8 +115,6 @@ namespace IT_ASSET.Migrations
 
                     b.HasKey("id");
 
-                    b.HasIndex("UserAccountabilityListid");
-
                     b.HasIndex("owner_id");
 
                     b.ToTable("Assets");
@@ -200,9 +198,8 @@ namespace IT_ASSET.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("asset_ids")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("asset_id")
+                        .HasColumnType("int");
 
                     b.Property<int>("owner_id")
                         .HasColumnType("int");
@@ -212,6 +209,8 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("id");
+
+                    b.HasIndex("asset_id");
 
                     b.HasIndex("owner_id");
 
@@ -260,10 +259,6 @@ namespace IT_ASSET.Migrations
 
             modelBuilder.Entity("Asset", b =>
                 {
-                    b.HasOne("IT_ASSET.Models.UserAccountabilityList", null)
-                        .WithMany("assets")
-                        .HasForeignKey("UserAccountabilityListid");
-
                     b.HasOne("User", "owner")
                         .WithMany("assets")
                         .HasForeignKey("owner_id")
@@ -296,18 +291,21 @@ namespace IT_ASSET.Migrations
 
             modelBuilder.Entity("IT_ASSET.Models.UserAccountabilityList", b =>
                 {
+                    b.HasOne("Asset", "asset")
+                        .WithMany()
+                        .HasForeignKey("asset_id")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
                     b.HasOne("User", "owner")
                         .WithMany()
                         .HasForeignKey("owner_id")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.Navigation("owner");
-                });
+                    b.Navigation("asset");
 
-            modelBuilder.Entity("IT_ASSET.Models.UserAccountabilityList", b =>
-                {
-                    b.Navigation("assets");
+                    b.Navigation("owner");
                 });
 
             modelBuilder.Entity("User", b =>

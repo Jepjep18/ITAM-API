@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\IT_ASSET.props" />
-</Project>

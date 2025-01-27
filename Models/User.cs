@@ -7,7 +7,7 @@
     public string? employee_id { get; set; }
     public string? password { get; set; }
     public string? e_signature { get; set; }
-    public DateTime? DateCreated { get; set; }
+    public DateTime? date_created { get; set; }
 
 
     public bool is_active { get; set; }
