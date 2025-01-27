@@ -1,6 +1,7 @@
 ﻿using IT_ASSET.DTOs;
 using IT_ASSET.Models;
 using IT_ASSET.Models.Logs;
+using IT_ASSET.Services.NewFolder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,54 +15,19 @@ using System.Threading.Tasks;
 public class AssetsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly AssetImportService _assetImportService;
 
-    public AssetsController(AppDbContext context)
+
+
+    public AssetsController(AppDbContext context , AssetImportService assetImportService)
     {
         _context = context;
+        _assetImportService = assetImportService;
+
     }
 
 
-    private string GetNextAccountabilityCode()
-    {
-        var lastAccountabilityCode = _context.user_accountability_lists
-            .OrderByDescending(ual => ual.accountability_code)
-            .Select(ual => ual.accountability_code)
-            .FirstOrDefault();
 
-        int nextCode = 1;
-
-        if (!string.IsNullOrEmpty(lastAccountabilityCode))
-        {
-            var lastNumber = lastAccountabilityCode.Substring(lastAccountabilityCode.LastIndexOf('-') + 1);
-            if (int.TryParse(lastNumber, out int lastNumberParsed))
-            {
-                nextCode = lastNumberParsed + 1;
-            }
-        }
-
-        return $"ACID-{nextCode:D4}"; 
-    }
-
-    private string GetNextTrackingCode()
-    {
-        var lastTrackingCode = _context.user_accountability_lists
-            .OrderByDescending(ual => ual.tracking_code)
-            .Select(ual => ual.tracking_code)
-            .FirstOrDefault();
-
-        int nextCode = 1;
-
-        if (!string.IsNullOrEmpty(lastTrackingCode))
-        {
-            var lastNumber = lastTrackingCode.Substring(lastTrackingCode.LastIndexOf('-') + 1);
-            if (int.TryParse(lastNumber, out int lastNumberParsed))
-            {
-                nextCode = lastNumberParsed + 1;
-            }
-        }
-
-        return $"TRID-{nextCode:D4}"; 
-    }
 
     [HttpPost("import")]
     public async Task<IActionResult> ImportAssets(IFormFile file)
@@ -69,150 +35,17 @@ public class AssetsController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded.");
 
-        using (var stream = file.OpenReadStream())
-        using (var package = new ExcelPackage(stream))
+        try
         {
-            var worksheet = package.Workbook.Worksheets[0];
-            var rowCount = worksheet.Dimension.Rows;
+            // Delegate the logic of importing assets to the service
+            var result = await _assetImportService.ImportAssetsAsync(file);
 
-            var lastAccountabilityCode = _context.user_accountability_lists
-                .OrderByDescending(ual => ual.accountability_code)
-                .Select(ual => ual.accountability_code)
-                .FirstOrDefault();
-            int accountabilityCodeCounter = 1;
-            if (!string.IsNullOrEmpty(lastAccountabilityCode))
-            {
-                var lastNumber = lastAccountabilityCode.Substring(lastAccountabilityCode.LastIndexOf('-') + 1);
-                if (int.TryParse(lastNumber, out var lastNumberParsed))
-                {
-                    accountabilityCodeCounter = lastNumberParsed + 1;
-                }
-            }
-
-            var lastTrackingCode = _context.user_accountability_lists
-                .OrderByDescending(ual => ual.tracking_code)
-                .Select(ual => ual.tracking_code)
-                .FirstOrDefault();
-            int trackingCodeCounter = 1;
-            if (!string.IsNullOrEmpty(lastTrackingCode))
-            {
-                var lastNumber = lastTrackingCode.Substring(lastTrackingCode.LastIndexOf('-') + 1);
-                if (int.TryParse(lastNumber, out var lastNumberParsed))
-                {
-                    trackingCodeCounter = lastNumberParsed + 1;
-                }
-            }
-
-            for (int row = 3; row <= rowCount; row++)
-            {
-                var user_name = worksheet.Cells[row, 1].Text.Trim();
-                var company = worksheet.Cells[row, 2].Text.Trim();
-                var department = worksheet.Cells[row, 3].Text.Trim();
-
-                var user = await _context.Users
-                    .FirstOrDefaultAsync(u => u.name == user_name && u.company == company && u.department == department);
-
-                if (user == null)
-                {
-                    user = new User
-                    {
-                        name = user_name,
-                        company = company,
-                        department = department
-                    };
-                    _context.Users.Add(user);
-                    await _context.SaveChangesAsync();
-                }
-
-                string date_acquired = string.Empty;
-                var acqDateCellValue = worksheet.Cells[row, 5].Text.Trim();
-
-                if (double.TryParse(acqDateCellValue, out var serialDate))
-                {
-                    var date = DateTime.FromOADate(serialDate);
-                    date_acquired = date.ToString("MM/dd/yyyy");
-                }
-                else if (!string.IsNullOrWhiteSpace(acqDateCellValue))
-                {
-                    if (DateTime.TryParseExact(acqDateCellValue, "MM/dd/yy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
-                    {
-                        date_acquired = parsedDate.ToString("MM/dd/yyyy");
-                    }
-                    else
-                    {
-                        date_acquired = "Invalid Date";
-                    }
-                }
-
-                var li_description = string.Join(" ",
-                    worksheet.Cells[row, 7].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 4].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 8].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 9].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 10].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 11].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 12].Text?.Trim() ?? string.Empty,
-                    worksheet.Cells[row, 13].Text?.Trim() ?? string.Empty).Trim();
-
-                if (string.IsNullOrWhiteSpace(li_description))
-                {
-                    li_description = "No description available"; 
-                }
-
-                var asset = new Asset
-                {
-                    type = worksheet.Cells[row, 4].Text.Trim(),
-                    date_acquired = date_acquired,
-                    asset_barcode = worksheet.Cells[row, 6].Text.Trim(),
-                    brand = worksheet.Cells[row, 7].Text.Trim(),
-                    model = worksheet.Cells[row, 8].Text.Trim(),
-                    ram = worksheet.Cells[row, 9].Text.Trim(),
-                    storage = worksheet.Cells[row, 10].Text.Trim(),
-                    gpu = worksheet.Cells[row, 11].Text.Trim(),
-                    size = worksheet.Cells[row, 12].Text.Trim(),
-                    color = worksheet.Cells[row, 13].Text.Trim(),
-                    serial_no = worksheet.Cells[row, 14].Text.Trim(),
-                    po = worksheet.Cells[row, 15].Text.Trim(),
-                    warranty = worksheet.Cells[row, 16].Text.Trim(),
-                    cost = decimal.TryParse(worksheet.Cells[row, 17].Text.Trim(), out var cost) ? cost : 0,
-                    remarks = worksheet.Cells[row, 25].Text.Trim(),
-                    owner_id = user.id,
-                    date_created = DateTime.UtcNow,
-                    li_description = li_description 
-                };
-
-                _context.Assets.Add(asset);
-                await _context.SaveChangesAsync();
-
-                var userAccountabilityList = await _context.user_accountability_lists
-                    .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
-
-                if (userAccountabilityList == null)
-                {
-                    userAccountabilityList = new UserAccountabilityList
-                    {
-                        accountability_code = $"ACID-{accountabilityCodeCounter:D4}",
-                        tracking_code = $"TRID-{trackingCodeCounter:D4}",
-                        owner_id = user.id,
-                        asset_ids = asset.id.ToString()
-                    };
-                    _context.user_accountability_lists.Add(userAccountabilityList);
-
-                    accountabilityCodeCounter++;
-                    trackingCodeCounter++;
-                }
-                else
-                {
-                    var existingAssetIds = userAccountabilityList.asset_ids.Split(',').Select(int.Parse).ToList();
-                    existingAssetIds.Add(asset.id);
-                    userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
-                }
-
-                await _context.SaveChangesAsync();
-            }
+            return Ok(result); // Return the success message from the service
         }
-
-        return Ok("Assets imported successfully.");
+        catch (Exception ex)
+        {
+            return BadRequest($"Error importing assets: {ex.Message}");
+        }
     }
 
 

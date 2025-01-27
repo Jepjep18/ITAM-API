@@ -1,4 +1,5 @@
 
+using IT_ASSET.Services.NewFolder;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 
@@ -12,6 +13,8 @@ builder.Services.AddControllers();
 // Register the services
 //builder.Services.AddScoped<IAssetService, AssetService>();
 //builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<AssetImportService>();
+
 
 
 // Add DbContext
