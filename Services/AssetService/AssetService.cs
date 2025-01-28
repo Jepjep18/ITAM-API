@@ -20,45 +20,143 @@ namespace IT_ASSET.Services.NewFolder
 
         public async Task<string> AddAssetAsync(AddAssetDto assetDto)
         {
-            // Find or create the user
-            var user = await _userService.FindOrCreateUserAsync(assetDto);
-            if (user == null) throw new Exception("Error creating or finding user.");
+            // Validate input
+            if (string.IsNullOrWhiteSpace(assetDto.type) || string.IsNullOrWhiteSpace(assetDto.asset_barcode))
+            {
+                throw new ArgumentException("Type and Asset Barcode are required.");
+            }
 
-            // Generate li_description
+            var user = await _userService.FindOrCreateUserAsync(assetDto);
+            if (user == null) throw new Exception("User not found or could not be created.");
+
             var liDescription = GenerateLiDescription(assetDto);
 
-            // Create the asset
-            var asset = new Asset
+            var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
+    };
+
+            try
             {
-                type = assetDto.type,
-                date_acquired = assetDto.date_acquired,
-                asset_barcode = assetDto.asset_barcode,
-                brand = assetDto.brand,
-                model = assetDto.model,
-                ram = assetDto.ram,
-                ssd = assetDto.ssd,
-                hdd = assetDto.hdd,
-                gpu = assetDto.gpu,
-                size = assetDto.size,
-                color = assetDto.color,
-                serial_no = assetDto.serial_no,
-                po = assetDto.po,
-                warranty = assetDto.warranty,
-                cost = assetDto.cost,
-                remarks = assetDto.remarks,
-                owner_id = user.id,
-                li_description = liDescription,
-                date_created = DateTime.UtcNow
+                if (computerTypes.Contains(assetDto.type))
+                {
+                    var computer = new Computer
+                    {
+                        type = assetDto.type,
+                        asset_barcode = assetDto.asset_barcode,
+                        owner_id = user.id,
+                        // other properties...
+                    };
+
+                    _context.computers.Add(computer);
+                    await _context.SaveChangesAsync();
+
+                    // Handle user accountability list for computer
+                    await HandleUserAccountabilityListAsync(user, computer);
+
+                    // Store components in the computer_components table
+                    await StoreInComputerComponentsAsync(assetDto, user);
+
+                    return "Computer added successfully.";
+                }
+                else
+                {
+                    var asset = new Asset
+                    {
+                        type = assetDto.type,
+                        asset_barcode = assetDto.asset_barcode,
+                        owner_id = user.id,
+                        // other properties...
+                    };
+
+                    _context.Assets.Add(asset);
+                    await _context.SaveChangesAsync();
+
+                    // Handle user accountability list for asset
+                    await HandleUserAccountabilityListAsync(user, asset);
+
+                    return "Asset added successfully.";
+                }
+            }
+            catch (DbUpdateException dbEx)
+            {
+                Console.WriteLine($"Database Update Exception: {dbEx.Message}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {dbEx.InnerException.Message}");
+                }
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"General Exception: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                }
+                throw;
+            }
+        }
+
+
+
+        public async Task StoreInComputerComponentsAsync(AddAssetDto assetDto, User user)
+        {
+            // Assuming assetDto contains the data for components like RAM, SSD, etc.
+            var assetBarcode = assetDto.asset_barcode;  // Asset barcode from DTO
+            var ownerId = user.id;
+
+            // Define headers that you want to store as 'type'
+            var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
+            var values = new string[]
+            {
+                assetDto.ram,  // 'RAM' from DTO
+                assetDto.ssd,  // 'SSD' from DTO
+                assetDto.hdd,  // 'HDD' from DTO
+                assetDto.gpu   // 'GPU' from DTO
             };
 
-            _context.Assets.Add(asset);
-            await _context.SaveChangesAsync();
+            // Loop through the headers and values to create components
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var description = values[i];
 
-            // Handle user accountability list
-            await HandleUserAccountabilityListAsync(user, asset);
+                // Only create a component if the description is not empty
+                if (!string.IsNullOrWhiteSpace(description))
+                {
+                    var component = new ComputerComponents
+                    {
+                        type = headers[i],
+                        description = description,
+                        asset_barcode = assetBarcode,
+                        status = ownerId != null ? "Released" : "New",
+                        history = new List<string>(), // Empty list, as there is no history at this point
+                        owner_id = ownerId
+                    };
 
-            return "Asset added successfully.";
+                    _context.computer_components.Add(component);
+                    Console.WriteLine($"Adding {component.type}: {component.description}");
+
+                    // Handle user accountability list for computer component
+                    await HandleUserAccountabilityListAsync(user, component);
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Data saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while saving: {ex.Message}");
+            }
         }
+
+
+
+
+
 
         private string GenerateLiDescription(AddAssetDto assetDto)
         {
@@ -76,7 +174,103 @@ namespace IT_ASSET.Services.NewFolder
             return string.IsNullOrWhiteSpace(liDescription) ? "No description available" : liDescription;
         }
 
-        private async Task HandleUserAccountabilityListAsync(User user, Asset asset)
+        private async Task HandleUserAccountabilityListAsync(User user, object item)
+        {
+            if (user == null)
+            {
+                throw new ArgumentNullException(nameof(user), "User cannot be null.");
+            }
+
+            if (item == null)
+            {
+                throw new ArgumentNullException(nameof(item), "Item cannot be null.");
+            }
+
+            // Fetch the user accountability list
+            var userAccountabilityList = await _context.user_accountability_lists
+                .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
+
+            if (userAccountabilityList == null)
+            {
+                // Create new accountability and tracking codes
+                var accountabilityCode = GenerateAccountabilityCode();
+                var trackingCode = GenerateTrackingCode();
+
+                userAccountabilityList = new UserAccountabilityList
+                {
+                    accountability_code = accountabilityCode,
+                    tracking_code = trackingCode,
+                    owner_id = user.id,
+                    asset_ids = string.Empty,   // Initially empty
+                    computer_ids = string.Empty // Initially empty
+                };
+
+                // Add the new entity to the context and save it to get a generated ID
+                _context.user_accountability_lists.Add(userAccountabilityList);
+                await _context.SaveChangesAsync();  // Save changes to get the generated ID
+                Console.WriteLine($"Created new UserAccountabilityList for User ID: {user.id}");
+            }
+            else
+            {
+                Console.WriteLine($"UserAccountabilityList found for User ID: {user.id}");
+            }
+
+            // Update asset_ids or computer_ids based on item type
+            try
+            {
+                if (item is Asset asset)
+                {
+                    Console.WriteLine($"Adding Asset ID: {asset.id} to User {user.id}");
+
+                    // If asset_ids is null or empty, initialize as an empty list
+                    var existingAssetIds = string.IsNullOrEmpty(userAccountabilityList.asset_ids)
+                        ? new List<int>()
+                        : userAccountabilityList.asset_ids.Split(',').Where(id => !string.IsNullOrWhiteSpace(id)).Select(int.Parse).ToList();
+
+                    existingAssetIds.Add(asset.id);
+                    userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
+                }
+                else if (item is Computer computer) // Added this case to handle Computer objects
+                {
+                    Console.WriteLine($"Adding Computer ID: {computer.id} to User {user.id}");
+
+                    // If computer_ids is null or empty, initialize as an empty list
+                    var existingComponentIds = string.IsNullOrEmpty(userAccountabilityList.computer_ids)
+                        ? new List<int>()
+                        : userAccountabilityList.computer_ids.Split(',').Where(id => !string.IsNullOrWhiteSpace(id)).Select(int.Parse).ToList();
+
+                    // Check if the new computer ID already exists in the list to avoid duplication
+                    if (!existingComponentIds.Contains(computer.id))
+                    {
+                        existingComponentIds.Add(computer.id);
+                    }
+
+                    userAccountabilityList.computer_ids = string.Join(",", existingComponentIds);
+                }
+
+                // Log the updated values for debugging
+                Console.WriteLine($"Updated asset_ids: {userAccountabilityList.asset_ids}");
+                Console.WriteLine($"Updated computer_ids: {userAccountabilityList.computer_ids}");
+
+                // After modifying the lists, mark the entity as modified and save changes
+                _context.user_accountability_lists.Update(userAccountabilityList);
+                await _context.SaveChangesAsync();
+                Console.WriteLine("User Accountability List updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while updating User Accountability List: {ex.Message}");
+                throw;
+            }
+        }
+
+
+
+
+
+
+
+        private async Task HandleUserAccountabilityListForComputerAsync(User user, Computer computer)
         {
             var userAccountabilityList = await _context.user_accountability_lists
                 .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
@@ -92,22 +286,30 @@ namespace IT_ASSET.Services.NewFolder
                     accountability_code = accountabilityCode,
                     tracking_code = trackingCode,
                     owner_id = user.id,
-                    asset_ids = asset.id.ToString()
+                    computer_ids = computer.id.ToString()
                 };
 
                 _context.user_accountability_lists.Add(userAccountabilityList);
             }
             else
             {
-                // Update existing accountability list with new asset ID
-                var existingAssetIds = userAccountabilityList.asset_ids.Split(',').Select(int.Parse).ToList();
-                existingAssetIds.Add(asset.id);
-                userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
+                // Update existing accountability list with new computer ID
+                var existingComputerIds = string.IsNullOrEmpty(userAccountabilityList.computer_ids)
+                    ? new List<int>()
+                    : userAccountabilityList.computer_ids.Split(',').Select(int.Parse).ToList();
+
+                if (!existingComputerIds.Contains(computer.id))
+                {
+                    existingComputerIds.Add(computer.id);
+                    userAccountabilityList.computer_ids = string.Join(",", existingComputerIds);
+                }
+
                 _context.user_accountability_lists.Update(userAccountabilityList);
             }
 
             await _context.SaveChangesAsync();
         }
+
 
         private string GenerateAccountabilityCode()
         {

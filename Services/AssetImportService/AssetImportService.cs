@@ -28,8 +28,7 @@ namespace IT_ASSET.Services.NewFolder
                 "CPU CORE i7 10th GEN",
                 "CPU INTEL CORE i5",
                 "Laptop",
-                "Laptop Macbook AIR",
-                "NB 15S-DUI537TU"
+                "Laptop Macbook AIR, NB 15S-DUI537TU"
             };
 
             // Initialize counters for accountability and tracking codes
@@ -47,12 +46,31 @@ namespace IT_ASSET.Services.NewFolder
                     if (IsRowEmpty(worksheet, row))
                         continue;
 
+                    var assetType = GetCellValue(worksheet.Cells[row, 4]);
+
+                    // Skip row if type is null, empty, or invalid
+                    if (string.IsNullOrWhiteSpace(assetType))
+                        continue;
+
                     var user = await EnsureUserAsync(worksheet, row);
 
                     var dateAcquired = ParseDate(GetCellValue(worksheet.Cells[row, 5]));
                     var liDescription = BuildDescription(worksheet, row);
 
-                    var assetType = GetCellValue(worksheet.Cells[row, 4]);
+                    // Get history data from columns 19 to 25
+                    var history = new List<string>
+                    {
+                        GetCellValue(worksheet.Cells[row, 19]),
+                        GetCellValue(worksheet.Cells[row, 20]),
+                        GetCellValue(worksheet.Cells[row, 21]),
+                        GetCellValue(worksheet.Cells[row, 22]),
+                        GetCellValue(worksheet.Cells[row, 23]),
+                        GetCellValue(worksheet.Cells[row, 24]),
+                        GetCellValue(worksheet.Cells[row, 25])
+                    };
+
+                    // Remove any null or empty history values
+                    history.RemoveAll(item => string.IsNullOrWhiteSpace(item));
 
                     if (computerTypes.Contains(assetType))
                     {
@@ -77,7 +95,8 @@ namespace IT_ASSET.Services.NewFolder
                             remarks = GetCellValue(worksheet.Cells[row, 26]),
                             owner_id = user.id,
                             date_created = DateTime.UtcNow,
-                            li_description = liDescription
+                            li_description = liDescription,
+                            history = history // Assigning the history list to the computer
                         };
 
                         try
@@ -125,7 +144,8 @@ namespace IT_ASSET.Services.NewFolder
                             remarks = GetCellValue(worksheet.Cells[row, 26]),
                             owner_id = user.id,
                             date_created = DateTime.UtcNow,
-                            li_description = liDescription
+                            li_description = liDescription,
+                            history = history // Assigning the history list to the asset
                         };
 
                         try
@@ -154,8 +174,11 @@ namespace IT_ASSET.Services.NewFolder
                 }
             }
 
-            return "Assets and computers imported successfully.";
+            return "Import completed successfully.";
         }
+
+
+
 
         private bool IsInvalidRow(ExcelWorksheet worksheet, int row)
         {
@@ -199,7 +222,7 @@ namespace IT_ASSET.Services.NewFolder
             return decimal.TryParse(cell.Text.Trim(), out var result) ? result : (decimal?)null;
         }
 
-        
+
 
         // Method to store components like RAM, SSD, etc., in the ComputerComponents table
         private async Task StoreInComputerComponentsAsync(ExcelWorksheet worksheet, int row, string assetType, User user)
@@ -209,28 +232,50 @@ namespace IT_ASSET.Services.NewFolder
 
             // Define headers that you want to store as 'type'
             var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
-            var values = new string[] {
-            assetType, // 'TYPE' value from the Excel data
+            var values = new string[]
+            {
             worksheet.Cells[row, 9].Text.Trim(),  // 'RAM'
             worksheet.Cells[row, 10].Text.Trim(), // 'SSD'
             worksheet.Cells[row, 11].Text.Trim(), // 'HDD'
             worksheet.Cells[row, 12].Text.Trim(), // 'GPU'
-    };
+            };
 
+            // Extract history data from columns 19 to 25
+            var history = new List<string>
+            {
+                worksheet.Cells[row, 19].Text.Trim(),
+                worksheet.Cells[row, 20].Text.Trim(),
+                worksheet.Cells[row, 21].Text.Trim(),
+                worksheet.Cells[row, 22].Text.Trim(),
+                worksheet.Cells[row, 23].Text.Trim(),
+                worksheet.Cells[row, 24].Text.Trim(),
+                worksheet.Cells[row, 25].Text.Trim()
+            };
+
+            // Remove empty or null entries from history
+            history.RemoveAll(item => string.IsNullOrWhiteSpace(item));
+
+            // Loop through the headers and values to create components
             for (int i = 0; i < headers.Length; i++)
             {
-                var component = new ComputerComponents
-                {
-                    type = headers[i],
-                    description = values[i],
-                    asset_barcode = assetBarcode,
-                    status = ownerId != null ? "Released" : "New",
-                    history = new List<string> { values[i] },
-                    owner_id = ownerId
-                };
+                var description = values[i];
 
-                _context.computer_components.Add(component);
-                Console.WriteLine($"Adding {component.type}: {component.description}");
+                // Only create a component if the description is not empty
+                if (!string.IsNullOrWhiteSpace(description))
+                {
+                    var component = new ComputerComponents
+                    {
+                        type = headers[i],
+                        description = description,
+                        asset_barcode = assetBarcode,
+                        status = ownerId != null ? "Released" : "New",
+                        history = new List<string>(history), // Assign the same history data to each component
+                        owner_id = ownerId
+                    };
+
+                    _context.computer_components.Add(component);
+                    Console.WriteLine($"Adding {component.type}: {component.description}");
+                }
             }
 
             try
@@ -243,6 +288,7 @@ namespace IT_ASSET.Services.NewFolder
                 Console.WriteLine($"Error while saving: {ex.Message}");
             }
         }
+
 
         private async Task LogAssetActionAsync(Asset asset, string action, int performedByUserId, string details)
         {
