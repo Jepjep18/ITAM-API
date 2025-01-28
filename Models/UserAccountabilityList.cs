@@ -7,7 +7,10 @@
         public string tracking_code { get; set; }
         public int owner_id { get; set; }
         public string asset_ids { get; set; }
+        public string computer_ids { get; set; }
+
         public User owner { get; set; }
         public List<Asset> assets { get; set; }
+        public List<Computer> computer { get; set; }
     }
 }

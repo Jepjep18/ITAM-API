@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IT_ASSET.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250128013642_allownullables")]
+    partial class allownullables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -119,9 +122,6 @@ namespace IT_ASSET.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
 
-                    b.Property<int?>("UserAccountabilityListid")
-                        .HasColumnType("int");
-
                     b.Property<string>("asset_barcode")
                         .HasColumnType("nvarchar(max)");
 
@@ -192,8 +192,6 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("id");
-
-                    b.HasIndex("UserAccountabilityListid");
 
                     b.HasIndex("owner_id");
 
@@ -318,10 +316,6 @@ namespace IT_ASSET.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("computer_ids")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("owner_id")
                         .HasColumnType("int");
 
@@ -392,10 +386,6 @@ namespace IT_ASSET.Migrations
 
             modelBuilder.Entity("IT_ASSET.Models.Computer", b =>
                 {
-                    b.HasOne("IT_ASSET.Models.UserAccountabilityList", null)
-                        .WithMany("computer")
-                        .HasForeignKey("UserAccountabilityListid");
-
                     b.HasOne("User", "owner")
                         .WithMany("computer")
                         .HasForeignKey("owner_id")
@@ -450,8 +440,6 @@ namespace IT_ASSET.Migrations
             modelBuilder.Entity("IT_ASSET.Models.UserAccountabilityList", b =>
                 {
                     b.Navigation("assets");
-
-                    b.Navigation("computer");
                 });
 
             modelBuilder.Entity("User", b =>

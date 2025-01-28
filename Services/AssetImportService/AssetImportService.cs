@@ -21,8 +21,8 @@ namespace IT_ASSET.Services.NewFolder
             if (file == null || file.Length == 0)
                 throw new ArgumentException("No file uploaded.");
 
-            // Define the list of excluded asset types
-            var excludedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            // Define the list of types to store in the Computer table
+            var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "CPU",
                 "CPU CORE i7 10th GEN",
@@ -32,76 +32,216 @@ namespace IT_ASSET.Services.NewFolder
                 "NB 15S-DUI537TU"
             };
 
+            // Initialize counters for accountability and tracking codes
+            int accountabilityCodeCounter = 1;
+            int trackingCodeCounter = 1;
+
             using (var stream = file.OpenReadStream())
             using (var package = new ExcelPackage(stream))
             {
                 var worksheet = package.Workbook.Worksheets[0];
                 var rowCount = worksheet.Dimension.Rows;
 
-                int accountabilityCodeCounter = GetNextCodeCounter("accountability_code", "ACID-");
-                int trackingCodeCounter = GetNextCodeCounter("tracking_code", "TRID-");
-
-                for (int row = 3; row <= rowCount; row++)
+                for (int row = 2; row <= rowCount; row++)
                 {
+                    if (IsRowEmpty(worksheet, row))
+                        continue;
+
                     var user = await EnsureUserAsync(worksheet, row);
 
-                    var dateAcquired = ParseDate(worksheet.Cells[row, 5].Text.Trim());
+                    var dateAcquired = ParseDate(GetCellValue(worksheet.Cells[row, 5]));
                     var liDescription = BuildDescription(worksheet, row);
 
-                    var assetType = worksheet.Cells[row, 4].Text.Trim();
+                    var assetType = GetCellValue(worksheet.Cells[row, 4]);
 
-                    // If the asset type is in the excluded types list (like LAPTOP or CPU), store in computer components table
-                    if (excludedTypes.Contains(assetType))
+                    if (computerTypes.Contains(assetType))
                     {
                         // Store in Computer table
-                        await StoreInComputerComponentsAsync(worksheet, row, assetType, user);
-                        continue; // Skip adding it to Assets table
+                        var computer = new Computer
+                        {
+                            type = assetType,
+                            date_acquired = dateAcquired,
+                            asset_barcode = GetCellValue(worksheet.Cells[row, 6]),
+                            brand = GetCellValue(worksheet.Cells[row, 7]),
+                            model = GetCellValue(worksheet.Cells[row, 8]),
+                            ram = GetCellValue(worksheet.Cells[row, 9]),
+                            ssd = GetCellValue(worksheet.Cells[row, 10]),
+                            hdd = GetCellValue(worksheet.Cells[row, 11]),
+                            gpu = GetCellValue(worksheet.Cells[row, 12]),
+                            size = GetCellValue(worksheet.Cells[row, 13]),
+                            color = GetCellValue(worksheet.Cells[row, 14]),
+                            serial_no = GetCellValue(worksheet.Cells[row, 15]),
+                            po = GetCellValue(worksheet.Cells[row, 16]),
+                            warranty = GetCellValue(worksheet.Cells[row, 17]),
+                            cost = TryParseDecimal(worksheet.Cells[row, 18]) ?? 0,
+                            remarks = GetCellValue(worksheet.Cells[row, 26]),
+                            owner_id = user.id,
+                            date_created = DateTime.UtcNow,
+                            li_description = liDescription
+                        };
+
+                        try
+                        {
+                            _context.computers.Add(computer);
+                            await _context.SaveChangesAsync();
+
+                            // After storing the computer, store the components in computer_components table
+                            await StoreInComputerComponentsAsync(worksheet, row, assetType, user);
+
+                            // Update the UserAccountabilityList with accountability and tracking codes for Computer
+                            var (updatedAccountabilityCodeCounter, updatedTrackingCodeCounter) =
+                                await UpdateUserAccountabilityListAsync(user, computer, accountabilityCodeCounter, trackingCodeCounter);
+
+                            // Update the counters
+                            accountabilityCodeCounter = updatedAccountabilityCodeCounter;
+                            trackingCodeCounter = updatedTrackingCodeCounter;
+                        }
+                        catch (DbUpdateException dbEx)
+                        {
+                            var innerException = dbEx.InnerException?.Message ?? dbEx.Message;
+                            throw new Exception($"Error saving computer: {innerException}");
+                        }
                     }
-
-                    // Create and store the asset in the Assets table if it doesn't match the excluded types
-                    var asset = new Asset
+                    else
                     {
-                        type = assetType,
-                        date_acquired = dateAcquired,
-                        asset_barcode = worksheet.Cells[row, 6].Text.Trim(),
-                        brand = worksheet.Cells[row, 7].Text.Trim(),
-                        model = worksheet.Cells[row, 8].Text.Trim(),
-                        ram = worksheet.Cells[row, 9].Text.Trim(),
-                        ssd = worksheet.Cells[row, 10].Text.Trim(),
-                        hdd = worksheet.Cells[row, 11].Text.Trim(),
-                        gpu = worksheet.Cells[row, 12].Text.Trim(),
-                        size = worksheet.Cells[row, 13].Text.Trim(),
-                        color = worksheet.Cells[row, 14].Text.Trim(),
-                        serial_no = worksheet.Cells[row, 15].Text.Trim(),
-                        po = worksheet.Cells[row, 16].Text.Trim(),
-                        warranty = worksheet.Cells[row, 17].Text.Trim(),
-                        cost = decimal.TryParse(worksheet.Cells[row, 18].Text.Trim(), out var cost) ? cost : 0,
-                        remarks = worksheet.Cells[row, 26].Text.Trim(),
-                        owner_id = user.id,
-                        date_created = DateTime.UtcNow,
-                        li_description = liDescription
-                    };
+                        // Store in Asset table
+                        var asset = new Asset
+                        {
+                            type = assetType,
+                            date_acquired = dateAcquired,
+                            asset_barcode = GetCellValue(worksheet.Cells[row, 6]),
+                            brand = GetCellValue(worksheet.Cells[row, 7]),
+                            model = GetCellValue(worksheet.Cells[row, 8]),
+                            ram = GetCellValue(worksheet.Cells[row, 9]),
+                            ssd = GetCellValue(worksheet.Cells[row, 10]),
+                            hdd = GetCellValue(worksheet.Cells[row, 11]),
+                            gpu = GetCellValue(worksheet.Cells[row, 12]),
+                            size = GetCellValue(worksheet.Cells[row, 13]),
+                            color = GetCellValue(worksheet.Cells[row, 14]),
+                            serial_no = GetCellValue(worksheet.Cells[row, 15]),
+                            po = GetCellValue(worksheet.Cells[row, 16]),
+                            warranty = GetCellValue(worksheet.Cells[row, 17]),
+                            cost = TryParseDecimal(worksheet.Cells[row, 18]) ?? 0,
+                            remarks = GetCellValue(worksheet.Cells[row, 26]),
+                            owner_id = user.id,
+                            date_created = DateTime.UtcNow,
+                            li_description = liDescription
+                        };
 
-                    _context.Assets.Add(asset);
-                    await _context.SaveChangesAsync();
+                        try
+                        {
+                            _context.Assets.Add(asset);
+                            await _context.SaveChangesAsync();
 
-                    // Log the asset creation
-                    await LogAssetActionAsync(asset, "Asset Imported", user.id, $"Asset imported with barcode {asset.asset_barcode}.");
+                            // Log the asset creation
+                            await LogAssetActionAsync(asset, "Asset Imported", user.id,
+                                $"Asset of type {asset.type} with barcode {asset.asset_barcode} imported.");
 
-                    // Update user accountability list and get updated counters
-                    var (updatedAccountabilityCodeCounter, updatedTrackingCodeCounter) =
-                        await UpdateUserAccountabilityListAsync(user, asset, accountabilityCodeCounter, trackingCodeCounter);
+                            // Update the UserAccountabilityList with accountability and tracking codes for Asset
+                            var (updatedAccountabilityCodeCounter, updatedTrackingCodeCounter) =
+                                await UpdateUserAccountabilityListAsync(user, asset, accountabilityCodeCounter, trackingCodeCounter);
 
-                    // Log the user accountability update
-                    await LogUserActionAsync(user, "User Accountability Updated", user.id, $"Asset {asset.id} assigned to user {user.name}.");
-
-                    // Update the counters after the method call
-                    accountabilityCodeCounter = updatedAccountabilityCodeCounter;
-                    trackingCodeCounter = updatedTrackingCodeCounter;
+                            // Update the counters
+                            accountabilityCodeCounter = updatedAccountabilityCodeCounter;
+                            trackingCodeCounter = updatedTrackingCodeCounter;
+                        }
+                        catch (DbUpdateException dbEx)
+                        {
+                            var innerException = dbEx.InnerException?.Message ?? dbEx.Message;
+                            throw new Exception($"Error saving asset: {innerException}");
+                        }
+                    }
                 }
             }
 
-            return "Assets imported successfully.";
+            return "Assets and computers imported successfully.";
+        }
+
+        private bool IsInvalidRow(ExcelWorksheet worksheet, int row)
+        {
+            // Check if the entire row is empty
+            if (IsRowEmpty(worksheet, row))
+                return true;
+
+            // Check if essential columns are empty
+            var essentialColumns = new[] { 4, 6, 7, 8 }; // Columns for type, barcode, brand, model
+            foreach (var col in essentialColumns)
+            {
+                if (string.IsNullOrWhiteSpace(GetCellValue(worksheet.Cells[row, col])))
+                    return true;
+            }
+
+            return false;
+        }
+
+
+        // Helper to check if a row is empty
+        private bool IsRowEmpty(ExcelWorksheet worksheet, int row)
+        {
+            for (int col = 1; col <= worksheet.Dimension.Columns; col++)
+            {
+                if (!string.IsNullOrWhiteSpace(worksheet.Cells[row, col].Text))
+                    return false;
+            }
+            return true;
+        }
+
+        // Helper to safely get a cell value or return null
+        private string GetCellValue(ExcelRange cell)
+        {
+            var value = cell.Text.Trim();
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+
+        // Helper to safely parse a decimal or return null
+        private decimal? TryParseDecimal(ExcelRange cell)
+        {
+            return decimal.TryParse(cell.Text.Trim(), out var result) ? result : (decimal?)null;
+        }
+
+        
+
+        // Method to store components like RAM, SSD, etc., in the ComputerComponents table
+        private async Task StoreInComputerComponentsAsync(ExcelWorksheet worksheet, int row, string assetType, User user)
+        {
+            var assetBarcode = worksheet.Cells[row, 6].Text.Trim(); // Assuming barcode is in column 6
+            var ownerId = user.id;
+
+            // Define headers that you want to store as 'type'
+            var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
+            var values = new string[] {
+            assetType, // 'TYPE' value from the Excel data
+            worksheet.Cells[row, 9].Text.Trim(),  // 'RAM'
+            worksheet.Cells[row, 10].Text.Trim(), // 'SSD'
+            worksheet.Cells[row, 11].Text.Trim(), // 'HDD'
+            worksheet.Cells[row, 12].Text.Trim(), // 'GPU'
+    };
+
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var component = new ComputerComponents
+                {
+                    type = headers[i],
+                    description = values[i],
+                    asset_barcode = assetBarcode,
+                    status = ownerId != null ? "Released" : "New",
+                    history = new List<string> { values[i] },
+                    owner_id = ownerId
+                };
+
+                _context.computer_components.Add(component);
+                Console.WriteLine($"Adding {component.type}: {component.description}");
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Data saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while saving: {ex.Message}");
+            }
         }
 
         private async Task LogAssetActionAsync(Asset asset, string action, int performedByUserId, string details)
@@ -206,66 +346,40 @@ namespace IT_ASSET.Services.NewFolder
             return string.Join(" ", descriptionParts.Where(part => !string.IsNullOrWhiteSpace(part))).Trim() ?? "No description available";
         }
 
-        private async Task StoreInComputerComponentsAsync(ExcelWorksheet worksheet, int row, string assetType, User user)
-        {
-            var assetBarcode = worksheet.Cells[row, 6].Text.Trim(); // Assuming barcode is in column 6
-            var ownerId = user.id;
 
-            // Define headers that you want to store as 'type'
-            var headers = new string[] { "TYPE", "BRAND", "MODEL", "RAM", "SSD", "HDD", "GPU", "SIZE", "COLOR" };
-            var values = new string[] {
-                assetType, // 'TYPE' value from the Excel data
-                worksheet.Cells[row, 7].Text.Trim(),  // 'BRAND'
-                worksheet.Cells[row, 8].Text.Trim(),  // 'MODEL'
-                worksheet.Cells[row, 9].Text.Trim(),  // 'RAM'
-                worksheet.Cells[row, 10].Text.Trim(), // 'SSD'
-                worksheet.Cells[row, 11].Text.Trim(), // 'HDD'
-                worksheet.Cells[row, 12].Text.Trim(), // 'GPU'
-                worksheet.Cells[row, 13].Text.Trim(), // 'SIZE'
-                worksheet.Cells[row, 14].Text.Trim()  // 'COLOR'
-            };
-
-            for (int i = 0; i < headers.Length; i++)
-            {
-                var component = new ComputerComponents
-                {
-                    type = headers[i],
-                    description = values[i],
-                    asset_barcode = assetBarcode,
-                    status = ownerId != null ? "Released" : "New",
-                    history = new List<string> { values[i] },
-                    owner_id = ownerId
-                };
-
-                _context.computer_components.Add(component);
-                Console.WriteLine($"Adding {component.type}: {component.description}"); // Debug log
-            }
-
-            try
-            {
-                await _context.SaveChangesAsync();
-                Console.WriteLine("Data saved successfully.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error while saving: {ex.Message}");
-            }
-        }
 
         private async Task<(int AccountabilityCodeCounter, int TrackingCodeCounter)> UpdateUserAccountabilityListAsync(
-            User user, Asset asset, int accountabilityCodeCounter, int trackingCodeCounter)
+        User user, object assetOrComputer, int accountabilityCodeCounter, int trackingCodeCounter)
         {
+            int assetId = 0;
+            int computerId = 0;
+
+            if (assetOrComputer is Asset asset)
+            {
+                assetId = asset.id; // Get Asset ID
+            }
+            else if (assetOrComputer is Computer computer)
+            {
+                computerId = computer.id; // Get Computer ID
+            }
+            else
+            {
+                throw new ArgumentException("Invalid asset or computer type.");
+            }
+
             var userAccountabilityList = await _context.user_accountability_lists
                 .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
 
             if (userAccountabilityList == null)
             {
+                // Ensure asset_ids and computer_ids are not null and provide default empty string values
                 userAccountabilityList = new UserAccountabilityList
                 {
                     accountability_code = $"ACID-{accountabilityCodeCounter:D4}",
                     tracking_code = $"TRID-{trackingCodeCounter:D4}",
                     owner_id = user.id,
-                    asset_ids = asset.id.ToString()
+                    asset_ids = assetId > 0 ? assetId.ToString() : "",  // Use empty string if no asset
+                    computer_ids = computerId > 0 ? computerId.ToString() : ""  // Use empty string if no computer
                 };
                 _context.user_accountability_lists.Add(userAccountabilityList);
 
@@ -274,14 +388,66 @@ namespace IT_ASSET.Services.NewFolder
             }
             else
             {
-                var existingAssetIds = userAccountabilityList.asset_ids.Split(',').Select(int.Parse).ToList();
-                existingAssetIds.Add(asset.id);
-                userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
+                // Safely parse asset_ids if they are not empty
+                if (!string.IsNullOrEmpty(userAccountabilityList.asset_ids))
+                {
+                    var existingAssetIds = userAccountabilityList.asset_ids
+                        .Split(',')
+                        .Where(id => !string.IsNullOrWhiteSpace(id)) // Ensure non-empty entries
+                        .Select(id => int.TryParse(id, out var parsedId) ? parsedId : 0) // Safely parse IDs
+                        .Where(id => id > 0) // Filter out invalid or 0 IDs
+                        .ToList();
+
+                    if (assetId > 0)
+                    {
+                        existingAssetIds.Add(assetId);
+                    }
+
+                    userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
+                }
+                else
+                {
+                    // If asset_ids is empty, initialize as an empty list or the current assetId
+                    if (assetId > 0)
+                    {
+                        userAccountabilityList.asset_ids = assetId.ToString();
+                    }
+                }
+
+                // Safely parse computer_ids if they are not empty
+                if (!string.IsNullOrEmpty(userAccountabilityList.computer_ids))
+                {
+                    var existingComputerIds = userAccountabilityList.computer_ids
+                        .Split(',')
+                        .Where(id => !string.IsNullOrWhiteSpace(id)) // Ensure non-empty entries
+                        .Select(id => int.TryParse(id, out var parsedId) ? parsedId : 0) // Safely parse IDs
+                        .Where(id => id > 0) // Filter out invalid or 0 IDs
+                        .ToList();
+
+                    if (computerId > 0)
+                    {
+                        existingComputerIds.Add(computerId);
+                    }
+
+                    userAccountabilityList.computer_ids = string.Join(",", existingComputerIds);
+                }
+                else
+                {
+                    // If computer_ids is empty, initialize as an empty list or the current computerId
+                    if (computerId > 0)
+                    {
+                        userAccountabilityList.computer_ids = computerId.ToString();
+                    }
+                }
             }
 
             await _context.SaveChangesAsync();
 
             return (accountabilityCodeCounter, trackingCodeCounter);
         }
+
+
+
+
     }
 }

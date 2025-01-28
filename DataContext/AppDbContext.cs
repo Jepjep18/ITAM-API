@@ -26,6 +26,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(a => a.owner_id)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<Computer>()
+            .HasOne(a => a.owner)
+            .WithMany(u => u.computer)
+            .HasForeignKey(a =>a.owner_id)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Configure one-to-many relationship (asset -> asset_logs)
         modelBuilder.Entity<Asset_logs>()
             .HasOne(al => al.assets)
@@ -49,10 +55,10 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<ComputerComponents>()
-    .HasOne(cc => cc.owner)  // Assuming `owner` is a navigation property in `ComputerComponents`
-    .WithMany(u => u.computer_components)  // Assuming `computer_components` is a navigation property in `User`
-    .HasForeignKey(cc => cc.owner_id)
-    .OnDelete(DeleteBehavior.Cascade);  // You can change DeleteBehavior as needed
+            .HasOne(cc => cc.owner)  // Assuming `owner` is a navigation property in `ComputerComponents`
+            .WithMany(u => u.computer_components)  // Assuming `computer_components` is a navigation property in `User`
+            .HasForeignKey(cc => cc.owner_id)
+            .OnDelete(DeleteBehavior.Cascade);
 
 
         //modelBuilder.Entity<UserAccountabilityList>()
