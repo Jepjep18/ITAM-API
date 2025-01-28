@@ -37,6 +37,12 @@
         public int OwnerId { get; set; }  
     }
 
+    public class AssignOwnerforComputerDto
+    {
+        public int computer_id { get; set; }
+        public int owner_id { get; set; }
+    }
+
     public class CreateAssetDto
     {
         public string type { get; set; }  

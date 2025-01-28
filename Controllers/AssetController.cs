@@ -120,32 +120,47 @@ public class AssetsController : ControllerBase
     }
 
     //assign owner for vacant asset items
-    [HttpPost("assign-owner")]
-        public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
+    [HttpPost("assign-owner-assets")]
+    public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
+    {
+        try
         {
-            var asset = await _context.Assets
-                .FirstOrDefaultAsync(a => a.id == assignOwnerDto.AssetId && a.owner_id == null);
-
-            if (asset == null)
-            {
-                return NotFound(new { message = "Vacant asset not found or already has an owner." });
-            }
-
-            var user = await _context.Users.FindAsync(assignOwnerDto.OwnerId);
-            if (user == null)
-            {
-                return NotFound(new { message = "Owner not found." });
-            }
-
-            asset.owner_id = assignOwnerDto.OwnerId;
-
-            _context.Assets.Update(asset);
-            await _context.SaveChangesAsync();
+            // Call the service to assign the owner and update accountability list
+            var asset = await _assetService.AssignOwnerToAssetAsync(assignOwnerDto);
 
             return Ok(new { message = "Owner assigned successfully to the asset.", asset });
         }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error assigning owner: {ex.Message}");
+        }
+    }
 
-    
+
+    [HttpPost("assign-owner-computer")]
+    public async Task<IActionResult> AssignOwnerToComputer([FromBody] AssignOwnerforComputerDto assignOwnerforComputerDto)
+    {
+        // Validate input
+        if (assignOwnerforComputerDto == null || assignOwnerforComputerDto.computer_id == 0 || assignOwnerforComputerDto.owner_id == 0)
+        {
+            return BadRequest("Invalid data.");
+        }
+
+        try
+        {
+            // Call the service to assign the owner
+            var result = await _assetService.AssignOwnerToComputerAsync(assignOwnerforComputerDto);
+
+            return Ok(new { message = "Owner assigned successfully to the computer.", result });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error assigning owner: {ex.Message}");
+        }
+    }
+
+
+    //post endpoint for creating vacant item for asset and computer items
     [HttpPost("create-vacant-asset/computer-items")]
     public async Task<IActionResult> CreateVacantAsset([FromBody] CreateAssetDto assetDto)
     {

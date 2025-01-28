@@ -392,7 +392,6 @@ namespace IT_ASSET.Services.NewFolder
                 "Laptop Macbook AIR, NB 15S-DUI537TU"
             };
 
-            // Validate and prepare the li_description
             var liDescription = string.Join(" ",
                 assetDto.brand?.Trim(),
                 assetDto.type?.Trim(),
@@ -406,7 +405,7 @@ namespace IT_ASSET.Services.NewFolder
 
             if (string.IsNullOrWhiteSpace(liDescription))
             {
-                liDescription = "No description available"; // Default value
+                liDescription = "No description available";
             }
 
             // Create a new asset or computer depending on the type
@@ -438,11 +437,10 @@ namespace IT_ASSET.Services.NewFolder
                     date_created = DateTime.UtcNow
                 };
 
-                // Add the computer to the database
                 _context.computers.Add(computer);
                 await _context.SaveChangesAsync();
 
-                return computer; // Return the created computer object
+                return computer;
             }
             else
             {
@@ -472,13 +470,144 @@ namespace IT_ASSET.Services.NewFolder
                     date_created = DateTime.UtcNow
                 };
 
-                // Add the asset to the database
                 _context.Assets.Add(asset);
                 await _context.SaveChangesAsync();
 
-                return asset; // Return the created asset object
+                return asset; 
             }
         }
+
+        //for assigning user for vacant-asset items
+        public async Task<Asset> AssignOwnerToAssetAsync(AssignOwnerDto assignOwnerDto)
+        {
+            var asset = await _context.Assets
+                .FirstOrDefaultAsync(a => a.id == assignOwnerDto.AssetId && a.owner_id == null);
+
+            if (asset == null)
+            {
+                throw new KeyNotFoundException("Vacant asset not found or already has an owner.");
+            }
+
+            var user = await _context.Users.FindAsync(assignOwnerDto.OwnerId);
+            if (user == null)
+            {
+                throw new KeyNotFoundException("Owner not found.");
+            }
+
+            asset.owner_id = assignOwnerDto.OwnerId;
+
+            _context.Assets.Update(asset);
+            await _context.SaveChangesAsync();
+
+            await UpdateUserAccountabilityListAsync(user, asset);
+
+            return asset; 
+        }
+
+        private async Task UpdateUserAccountabilityListAsync(User user, Asset asset)
+        {
+            var userAccountabilityList = await _context.user_accountability_lists
+                .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
+
+            if (userAccountabilityList == null)
+            {
+                var accountabilityCode = GenerateAccountabilityCode();
+                var trackingCode = GenerateTrackingCode();
+
+                userAccountabilityList = new UserAccountabilityList
+                {
+                    accountability_code = accountabilityCode,
+                    tracking_code = trackingCode,
+                    owner_id = user.id,
+                    asset_ids = string.Empty,   
+                    computer_ids = string.Empty 
+                };
+
+                _context.user_accountability_lists.Add(userAccountabilityList);
+                await _context.SaveChangesAsync();
+            }
+
+            var existingAssetIds = string.IsNullOrEmpty(userAccountabilityList.asset_ids)
+                ? new List<int>()
+                : userAccountabilityList.asset_ids.Split(',').Where(id => !string.IsNullOrWhiteSpace(id)).Select(int.Parse).ToList();
+
+            if (!existingAssetIds.Contains(asset.id))
+            {
+                existingAssetIds.Add(asset.id);
+                userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
+            }
+
+            _context.user_accountability_lists.Update(userAccountabilityList);
+            await _context.SaveChangesAsync();
+        }
+
+
+        //for assigning user for vacant-computer items
+        public async Task<Computer> AssignOwnerToComputerAsync(AssignOwnerforComputerDto assignOwnerforComputerDto)
+        {
+            var computer = await _context.computers
+                .FirstOrDefaultAsync(c => c.id == assignOwnerforComputerDto.computer_id && c.owner_id == null);
+
+            if (computer == null)
+            {
+                throw new KeyNotFoundException("Vacant computer not found or already has an owner.");
+            }
+
+            var user = await _context.Users.FindAsync(assignOwnerforComputerDto.owner_id);
+            if (user == null)
+            {
+                throw new KeyNotFoundException("Owner not found.");
+            }
+
+            computer.owner_id = assignOwnerforComputerDto.owner_id;
+
+            _context.computers.Update(computer);
+            await _context.SaveChangesAsync();
+
+            await UpdateUserAccountabilityListAsync(user, computer);
+
+            return computer;
+        }
+
+        private async Task UpdateUserAccountabilityListAsync(User user, Computer computer)
+        {
+            var userAccountabilityList = await _context.user_accountability_lists
+                .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
+
+            if (userAccountabilityList == null)
+            {
+                var accountabilityCode = GenerateAccountabilityCode();
+                var trackingCode = GenerateTrackingCode();
+
+                userAccountabilityList = new UserAccountabilityList
+                {
+                    accountability_code = accountabilityCode,
+                    tracking_code = trackingCode,
+                    owner_id = user.id,
+                    asset_ids = string.Empty,   
+                    computer_ids = string.Empty 
+                };
+
+                _context.user_accountability_lists.Add(userAccountabilityList);
+                await _context.SaveChangesAsync();
+            }
+
+            var existingComputerIds = string.IsNullOrEmpty(userAccountabilityList.computer_ids)
+                ? new List<int>()
+                : userAccountabilityList.computer_ids.Split(',').Where(id => !string.IsNullOrWhiteSpace(id)).Select(int.Parse).ToList();
+
+            if (!existingComputerIds.Contains(computer.id))
+            {
+                existingComputerIds.Add(computer.id);
+                userAccountabilityList.computer_ids = string.Join(",", existingComputerIds);
+            }
+
+            _context.user_accountability_lists.Update(userAccountabilityList);
+            await _context.SaveChangesAsync();
+        }
+
+
+
 
 
 
