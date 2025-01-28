@@ -20,7 +20,7 @@ namespace IT_ASSET.Services.NewFolder
 
         public async Task<string> AddAssetAsync(AddAssetDto assetDto)
         {
-            // Validate input
+            
             if (string.IsNullOrWhiteSpace(assetDto.type) || string.IsNullOrWhiteSpace(assetDto.asset_barcode))
             {
                 throw new ArgumentException("Type and Asset Barcode are required.");
@@ -32,9 +32,9 @@ namespace IT_ASSET.Services.NewFolder
             var liDescription = GenerateLiDescription(assetDto);
 
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
-    };
+            {
+                "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
+            };
 
             try
             {
@@ -45,16 +45,16 @@ namespace IT_ASSET.Services.NewFolder
                         type = assetDto.type,
                         asset_barcode = assetDto.asset_barcode,
                         owner_id = user.id,
-                        // other properties...
+                        
                     };
 
                     _context.computers.Add(computer);
                     await _context.SaveChangesAsync();
 
-                    // Handle user accountability list for computer
+                    
                     await HandleUserAccountabilityListAsync(user, computer);
 
-                    // Store components in the computer_components table
+                    
                     await StoreInComputerComponentsAsync(assetDto, user);
 
                     return "Computer added successfully.";
@@ -66,13 +66,13 @@ namespace IT_ASSET.Services.NewFolder
                         type = assetDto.type,
                         asset_barcode = assetDto.asset_barcode,
                         owner_id = user.id,
-                        // other properties...
+                        
                     };
 
                     _context.Assets.Add(asset);
                     await _context.SaveChangesAsync();
 
-                    // Handle user accountability list for asset
+                    
                     await HandleUserAccountabilityListAsync(user, asset);
 
                     return "Asset added successfully.";
@@ -102,26 +102,26 @@ namespace IT_ASSET.Services.NewFolder
 
         public async Task StoreInComputerComponentsAsync(AddAssetDto assetDto, User user)
         {
-            // Assuming assetDto contains the data for components like RAM, SSD, etc.
-            var assetBarcode = assetDto.asset_barcode;  // Asset barcode from DTO
+            
+            var assetBarcode = assetDto.asset_barcode; 
             var ownerId = user.id;
 
             // Define headers that you want to store as 'type'
             var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
             var values = new string[]
             {
-                assetDto.ram,  // 'RAM' from DTO
-                assetDto.ssd,  // 'SSD' from DTO
-                assetDto.hdd,  // 'HDD' from DTO
-                assetDto.gpu   // 'GPU' from DTO
+                assetDto.ram,  
+                assetDto.ssd,  
+                assetDto.hdd,  
+                assetDto.gpu   
             };
 
-            // Loop through the headers and values to create components
+            
             for (int i = 0; i < headers.Length; i++)
             {
                 var description = values[i];
 
-                // Only create a component if the description is not empty
+                
                 if (!string.IsNullOrWhiteSpace(description))
                 {
                     var component = new ComputerComponents
@@ -130,14 +130,14 @@ namespace IT_ASSET.Services.NewFolder
                         description = description,
                         asset_barcode = assetBarcode,
                         status = ownerId != null ? "Released" : "New",
-                        history = new List<string>(), // Empty list, as there is no history at this point
+                        history = new List<string>(), 
                         owner_id = ownerId
                     };
 
                     _context.computer_components.Add(component);
                     Console.WriteLine($"Adding {component.type}: {component.description}");
 
-                    // Handle user accountability list for computer component
+                    
                     await HandleUserAccountabilityListAsync(user, component);
                 }
             }
@@ -152,10 +152,6 @@ namespace IT_ASSET.Services.NewFolder
                 Console.WriteLine($"Error while saving: {ex.Message}");
             }
         }
-
-
-
-
 
 
         private string GenerateLiDescription(AddAssetDto assetDto)
@@ -186,13 +182,12 @@ namespace IT_ASSET.Services.NewFolder
                 throw new ArgumentNullException(nameof(item), "Item cannot be null.");
             }
 
-            // Fetch the user accountability list
             var userAccountabilityList = await _context.user_accountability_lists
                 .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
 
             if (userAccountabilityList == null)
             {
-                // Create new accountability and tracking codes
+                
                 var accountabilityCode = GenerateAccountabilityCode();
                 var trackingCode = GenerateTrackingCode();
 
@@ -201,13 +196,13 @@ namespace IT_ASSET.Services.NewFolder
                     accountability_code = accountabilityCode,
                     tracking_code = trackingCode,
                     owner_id = user.id,
-                    asset_ids = string.Empty,   // Initially empty
-                    computer_ids = string.Empty // Initially empty
+                    asset_ids = string.Empty,   
+                    computer_ids = string.Empty 
                 };
 
-                // Add the new entity to the context and save it to get a generated ID
+                
                 _context.user_accountability_lists.Add(userAccountabilityList);
-                await _context.SaveChangesAsync();  // Save changes to get the generated ID
+                await _context.SaveChangesAsync();  
                 Console.WriteLine($"Created new UserAccountabilityList for User ID: {user.id}");
             }
             else
@@ -215,7 +210,7 @@ namespace IT_ASSET.Services.NewFolder
                 Console.WriteLine($"UserAccountabilityList found for User ID: {user.id}");
             }
 
-            // Update asset_ids or computer_ids based on item type
+            
             try
             {
                 if (item is Asset asset)
@@ -239,7 +234,7 @@ namespace IT_ASSET.Services.NewFolder
                         ? new List<int>()
                         : userAccountabilityList.computer_ids.Split(',').Where(id => !string.IsNullOrWhiteSpace(id)).Select(int.Parse).ToList();
 
-                    // Check if the new computer ID already exists in the list to avoid duplication
+                    
                     if (!existingComponentIds.Contains(computer.id))
                     {
                         existingComponentIds.Add(computer.id);
@@ -248,11 +243,11 @@ namespace IT_ASSET.Services.NewFolder
                     userAccountabilityList.computer_ids = string.Join(",", existingComponentIds);
                 }
 
-                // Log the updated values for debugging
+                
                 Console.WriteLine($"Updated asset_ids: {userAccountabilityList.asset_ids}");
                 Console.WriteLine($"Updated computer_ids: {userAccountabilityList.computer_ids}");
 
-                // After modifying the lists, mark the entity as modified and save changes
+                
                 _context.user_accountability_lists.Update(userAccountabilityList);
                 await _context.SaveChangesAsync();
                 Console.WriteLine("User Accountability List updated successfully.");
@@ -263,53 +258,6 @@ namespace IT_ASSET.Services.NewFolder
                 throw;
             }
         }
-
-
-
-
-
-
-
-        private async Task HandleUserAccountabilityListForComputerAsync(User user, Computer computer)
-        {
-            var userAccountabilityList = await _context.user_accountability_lists
-                .FirstOrDefaultAsync(ual => ual.owner_id == user.id);
-
-            if (userAccountabilityList == null)
-            {
-                // Create new accountability and tracking codes
-                var accountabilityCode = GenerateAccountabilityCode();
-                var trackingCode = GenerateTrackingCode();
-
-                userAccountabilityList = new UserAccountabilityList
-                {
-                    accountability_code = accountabilityCode,
-                    tracking_code = trackingCode,
-                    owner_id = user.id,
-                    computer_ids = computer.id.ToString()
-                };
-
-                _context.user_accountability_lists.Add(userAccountabilityList);
-            }
-            else
-            {
-                // Update existing accountability list with new computer ID
-                var existingComputerIds = string.IsNullOrEmpty(userAccountabilityList.computer_ids)
-                    ? new List<int>()
-                    : userAccountabilityList.computer_ids.Split(',').Select(int.Parse).ToList();
-
-                if (!existingComputerIds.Contains(computer.id))
-                {
-                    existingComputerIds.Add(computer.id);
-                    userAccountabilityList.computer_ids = string.Join(",", existingComputerIds);
-                }
-
-                _context.user_accountability_lists.Update(userAccountabilityList);
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
 
         private string GenerateAccountabilityCode()
         {
@@ -354,50 +302,82 @@ namespace IT_ASSET.Services.NewFolder
         }
 
 
-        //for upload image endpoint 
+        //for asset upload image endpoint 
         public async Task<string> UploadAssetImageAsync(int assetId, IFormFile assetImage)
         {
-            // Allowed file extensions for images
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
             var fileExtension = Path.GetExtension(assetImage.FileName).ToLower();
 
-            // Check if the file extension is allowed
             if (!allowedExtensions.Contains(fileExtension))
             {
                 throw new ArgumentException("Invalid file type. Only images are allowed.");
             }
 
-            // Find the asset in the database
             var asset = await _context.Assets.FindAsync(assetId);
             if (asset == null)
             {
                 throw new KeyNotFoundException("Asset not found.");
             }
 
-            // Construct the file name and path
             var fileName = $"{assetId}_{Path.GetFileName(assetImage.FileName)}";
             var directoryPath = @"C:\Users\JBARNADO\Desktop\ITAM\asset_image";
             var filePath = Path.Combine(directoryPath, fileName);
 
-            // Create the directory if it doesn't exist
             if (!Directory.Exists(directoryPath))
             {
                 Directory.CreateDirectory(directoryPath);
             }
 
-            // Save the image to the directory
             using (var stream = new FileStream(filePath, FileMode.Create))
             {
                 await assetImage.CopyToAsync(stream);
             }
 
-            // Update the asset with the file path
             asset.asset_image = filePath;
             _context.Assets.Update(asset);
             await _context.SaveChangesAsync();
 
             return filePath;
         }
+
+        //for computer upload image endpoint
+        public async Task<string> UploadComputerImageAsync(int computerId, IFormFile computerImage)
+        {
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+            var fileExtension = Path.GetExtension(computerImage.FileName).ToLower();
+
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                throw new ArgumentException("Invalid file type. Only images are allowed.");
+            }
+
+            var computer = await _context.computers.FindAsync(computerId);
+            if (computer == null)
+            {
+                throw new KeyNotFoundException("Computer not found.");
+            }
+
+            var fileName = $"{computerId}_{Path.GetFileName(computerImage.FileName)}";
+            var directoryPath = @"C:\Users\JBARNADO\Desktop\ITAM\computer_image";  
+            var filePath = Path.Combine(directoryPath, fileName);
+
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await computerImage.CopyToAsync(stream);
+            }
+
+            computer.asset_image = filePath; 
+            _context.computers.Update(computer);
+            await _context.SaveChangesAsync();
+
+            return filePath;  
+        }
+
 
         //for create-vacant-asset endpoint 
         public async Task<Asset> CreateVacantAssetAsync(CreateAssetDto assetDto)

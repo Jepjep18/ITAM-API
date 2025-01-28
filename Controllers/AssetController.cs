@@ -100,6 +100,29 @@ public class AssetsController : ControllerBase
         }
     }
 
+    [HttpPost("upload-computer-image/{computerId}")]
+    public async Task<IActionResult> UploadComputerImage(int computerId, IFormFile computerImage)
+    {
+        if (computerImage == null || computerImage.Length == 0)
+        {
+            return BadRequest("No file uploaded.");
+        }
+
+        try
+        {
+            // Call the service to handle the image upload
+            var filePath = await _assetService.UploadComputerImageAsync(computerId, computerImage);
+
+            return Ok(new { message = "Computer image uploaded successfully.", filePath });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error uploading image: {ex.Message}");
+        }
+    }
+
+
+
 
     [HttpPost("assign-owner")]
         public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
