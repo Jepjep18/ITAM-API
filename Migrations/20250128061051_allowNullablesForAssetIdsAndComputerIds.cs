@@ -5,46 +5,50 @@
 namespace IT_ASSET.Migrations
 {
     /// <inheritdoc />
-    public partial class modifyDataType : Migration
+    public partial class allowNullablesForAssetIdsAndComputerIds : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<string>(
-                name: "tracking_code",
+                name: "computer_ids",
                 table: "user_accountability_lists",
                 type: "nvarchar(max)",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "int");
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(max)");
 
             migrationBuilder.AlterColumn<string>(
-                name: "accountability_code",
+                name: "asset_ids",
                 table: "user_accountability_lists",
                 type: "nvarchar(max)",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "int");
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(max)");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<int>(
-                name: "tracking_code",
+            migrationBuilder.AlterColumn<string>(
+                name: "computer_ids",
                 table: "user_accountability_lists",
-                type: "int",
+                type: "nvarchar(max)",
                 nullable: false,
+                defaultValue: "",
                 oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
+                oldType: "nvarchar(max)",
+                oldNullable: true);
 
-            migrationBuilder.AlterColumn<int>(
-                name: "accountability_code",
+            migrationBuilder.AlterColumn<string>(
+                name: "asset_ids",
                 table: "user_accountability_lists",
-                type: "int",
+                type: "nvarchar(max)",
                 nullable: false,
+                defaultValue: "",
                 oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
+                oldType: "nvarchar(max)",
+                oldNullable: true);
         }
     }
 }

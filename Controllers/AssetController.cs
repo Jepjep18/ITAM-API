@@ -30,9 +30,7 @@ public class AssetsController : ControllerBase
 
     }
 
-
-
-
+    //store items from import for assets db tbl and computers db tbl
     [HttpPost("import")]
     public async Task<IActionResult> ImportAssets(IFormFile file)
     {
@@ -53,7 +51,7 @@ public class AssetsController : ControllerBase
     }
 
 
-
+    //add either assets item or computer item based on type
     [HttpPost("add-asset")]
     public async Task<IActionResult> AddAsset([FromBody] AddAssetDto assetDto)
     {
@@ -76,9 +74,7 @@ public class AssetsController : ControllerBase
     }
 
 
-
-
-
+    //upload image endpoint for asset items
     [HttpPost("upload-image/{assetId}")]
     public async Task<IActionResult> UploadAssetImage(int assetId, IFormFile assetImage)
     {
@@ -101,33 +97,71 @@ public class AssetsController : ControllerBase
     }
 
 
-    [HttpPost("assign-owner")]
-        public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
+    //upload image endpoint for computer items
+    [HttpPost("upload-computer-image/{computerId}")]
+    public async Task<IActionResult> UploadComputerImage(int computerId, IFormFile computerImage)
+    {
+        if (computerImage == null || computerImage.Length == 0)
         {
-            var asset = await _context.Assets
-                .FirstOrDefaultAsync(a => a.id == assignOwnerDto.AssetId && a.owner_id == null);
+            return BadRequest("No file uploaded.");
+        }
 
-            if (asset == null)
-            {
-                return NotFound(new { message = "Vacant asset not found or already has an owner." });
-            }
+        try
+        {
+            // Call the service to handle the image upload
+            var filePath = await _assetService.UploadComputerImageAsync(computerId, computerImage);
 
-            var user = await _context.Users.FindAsync(assignOwnerDto.OwnerId);
-            if (user == null)
-            {
-                return NotFound(new { message = "Owner not found." });
-            }
+            return Ok(new { message = "Computer image uploaded successfully.", filePath });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error uploading image: {ex.Message}");
+        }
+    }
 
-            asset.owner_id = assignOwnerDto.OwnerId;
-
-            _context.Assets.Update(asset);
-            await _context.SaveChangesAsync();
+    //assign owner for vacant asset items
+    [HttpPost("assign-owner-assets")]
+    public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
+    {
+        try
+        {
+            // Call the service to assign the owner and update accountability list
+            var asset = await _assetService.AssignOwnerToAssetAsync(assignOwnerDto);
 
             return Ok(new { message = "Owner assigned successfully to the asset.", asset });
         }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error assigning owner: {ex.Message}");
+        }
+    }
 
 
-    [HttpPost("create-vacant-asset")]
+    [HttpPost("assign-owner-computer")]
+    public async Task<IActionResult> AssignOwnerToComputer([FromBody] AssignOwnerforComputerDto assignOwnerforComputerDto)
+    {
+        // Validate input
+        if (assignOwnerforComputerDto == null || assignOwnerforComputerDto.computer_id == 0 || assignOwnerforComputerDto.owner_id == 0)
+        {
+            return BadRequest("Invalid data.");
+        }
+
+        try
+        {
+            // Call the service to assign the owner
+            var result = await _assetService.AssignOwnerToComputerAsync(assignOwnerforComputerDto);
+
+            return Ok(new { message = "Owner assigned successfully to the computer.", result });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error assigning owner: {ex.Message}");
+        }
+    }
+
+
+    //post endpoint for creating vacant item for asset and computer items
+    [HttpPost("create-vacant-asset/computer-items")]
     public async Task<IActionResult> CreateVacantAsset([FromBody] CreateAssetDto assetDto)
     {
         if (assetDto == null)

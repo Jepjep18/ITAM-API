@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IT_ASSET.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250127083146_addedRelationship")]
+    partial class addedRelationship
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,15 +36,18 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("asset_barcode")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("asset_image")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("brand")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("color")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("cost")
@@ -58,9 +64,11 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("gpu")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("hdd")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.PrimitiveCollection<string>("history")
@@ -70,36 +78,46 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("li_description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("model")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("owner_id")
                         .HasColumnType("int");
 
                     b.Property<string>("po")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ram")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("remarks")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("serial_no")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("size")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ssd")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("type")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("warranty")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("id");
@@ -119,25 +137,26 @@ namespace IT_ASSET.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
 
-                    b.Property<int?>("UserAccountabilityListid")
-                        .HasColumnType("int");
-
                     b.Property<string>("asset_barcode")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("asset_image")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("brand")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("color")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("cost")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("date_acquired")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("date_created")
@@ -147,9 +166,11 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("gpu")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("hdd")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.PrimitiveCollection<string>("history")
@@ -159,43 +180,54 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("li_description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("model")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("owner_id")
                         .HasColumnType("int");
 
+                    b.Property<int>("ownerid")
+                        .HasColumnType("int");
+
                     b.Property<string>("po")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ram")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("remarks")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("serial_no")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("size")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ssd")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("type")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("warranty")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("id");
 
-                    b.HasIndex("UserAccountabilityListid");
-
-                    b.HasIndex("owner_id");
+                    b.HasIndex("ownerid");
 
                     b.ToTable("computers");
                 });
@@ -315,9 +347,7 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("asset_ids")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("computer_ids")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("owner_id")
@@ -390,14 +420,11 @@ namespace IT_ASSET.Migrations
 
             modelBuilder.Entity("IT_ASSET.Models.Computer", b =>
                 {
-                    b.HasOne("IT_ASSET.Models.UserAccountabilityList", null)
-                        .WithMany("computer")
-                        .HasForeignKey("UserAccountabilityListid");
-
                     b.HasOne("User", "owner")
                         .WithMany("computer")
-                        .HasForeignKey("owner_id")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .HasForeignKey("ownerid")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("owner");
                 });
@@ -448,8 +475,6 @@ namespace IT_ASSET.Migrations
             modelBuilder.Entity("IT_ASSET.Models.UserAccountabilityList", b =>
                 {
                     b.Navigation("assets");
-
-                    b.Navigation("computer");
                 });
 
             modelBuilder.Entity("User", b =>

@@ -1,9 +1,10 @@
-
 using IT_ASSET.Services.NewFolder;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 
 var builder = WebApplication.CreateBuilder(args);
+var corsPolicyName = "AllowSpecificOrigins";
 
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
@@ -18,10 +19,21 @@ builder.Services.AddScoped<AssetService>();
 builder.Services.AddScoped<UserService>();
 
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicyName, policy =>
+    {
+        policy.WithOrigins("http://localhost:4200") // Replace with your Angular app's URL
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Optional: if you need to allow cookies/auth tokens
+    });
+});
 
 // Add DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -37,7 +49,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseExceptionHandler(appBuilder =>
+{
+    appBuilder.Run(async context =>
+    {
+        var exception = context.Features.Get<IExceptionHandlerPathFeature>()?.Error;
+        Console.WriteLine($"Exception: {exception?.Message}");
+        await context.Response.WriteAsJsonAsync(new { error = exception?.Message });
+    });
+});
+
+
+
 app.UseHttpsRedirection();
+app.UseCors(corsPolicyName);
 app.UseAuthorization();
 app.MapControllers();
 
