@@ -30,9 +30,7 @@ public class AssetsController : ControllerBase
 
     }
 
-
-
-
+    //store items from import for assets db tbl and computers db tbl
     [HttpPost("import")]
     public async Task<IActionResult> ImportAssets(IFormFile file)
     {
@@ -53,7 +51,7 @@ public class AssetsController : ControllerBase
     }
 
 
-
+    //add either assets item or computer item based on type
     [HttpPost("add-asset")]
     public async Task<IActionResult> AddAsset([FromBody] AddAssetDto assetDto)
     {
@@ -76,9 +74,7 @@ public class AssetsController : ControllerBase
     }
 
 
-
-
-
+    //upload image endpoint for asset items
     [HttpPost("upload-image/{assetId}")]
     public async Task<IActionResult> UploadAssetImage(int assetId, IFormFile assetImage)
     {
@@ -100,6 +96,8 @@ public class AssetsController : ControllerBase
         }
     }
 
+
+    //upload image endpoint for computer items
     [HttpPost("upload-computer-image/{computerId}")]
     public async Task<IActionResult> UploadComputerImage(int computerId, IFormFile computerImage)
     {
@@ -121,9 +119,7 @@ public class AssetsController : ControllerBase
         }
     }
 
-
-
-
+    //assign owner for vacant asset items
     [HttpPost("assign-owner")]
         public async Task<IActionResult> AssignOwnerToVacantAsset([FromBody] AssignOwnerDto assignOwnerDto)
         {
@@ -149,8 +145,8 @@ public class AssetsController : ControllerBase
             return Ok(new { message = "Owner assigned successfully to the asset.", asset });
         }
 
-
-    [HttpPost("create-vacant-asset")]
+    
+    [HttpPost("create-vacant-asset/computer-items")]
     public async Task<IActionResult> CreateVacantAsset([FromBody] CreateAssetDto assetDto)
     {
         if (assetDto == null)

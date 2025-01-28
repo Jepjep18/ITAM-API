@@ -379,9 +379,19 @@ namespace IT_ASSET.Services.NewFolder
         }
 
 
-        //for create-vacant-asset endpoint 
-        public async Task<Asset> CreateVacantAssetAsync(CreateAssetDto assetDto)
+        //for create-vacant-asset/computer endpoint 
+        public async Task<object> CreateVacantAssetAsync(CreateAssetDto assetDto)
         {
+            // Define types that should go to the computer database
+            var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "CPU",
+                "CPU CORE i7 10th GEN",
+                "CPU INTEL CORE i5",
+                "Laptop",
+                "Laptop Macbook AIR, NB 15S-DUI537TU"
+            };
+
             // Validate and prepare the li_description
             var liDescription = string.Join(" ",
                 assetDto.brand?.Trim(),
@@ -399,38 +409,77 @@ namespace IT_ASSET.Services.NewFolder
                 liDescription = "No description available"; // Default value
             }
 
-            // Create a new Asset object
-            var asset = new Asset
+            // Create a new asset or computer depending on the type
+            if (computerTypes.Contains(assetDto.type))
             {
-                type = assetDto.type,
-                asset_barcode = assetDto.asset_barcode,
-                brand = assetDto.brand,
-                model = assetDto.model,
-                ram = assetDto.ram,
-                ssd = assetDto.ssd,
-                hdd = assetDto.hdd,
-                gpu = assetDto.gpu,
-                size = assetDto.size,
-                color = assetDto.color,
-                serial_no = assetDto.serial_no,
-                po = assetDto.po,
-                warranty = assetDto.warranty,
-                cost = assetDto.cost,
-                remarks = assetDto.remarks,
-                li_description = liDescription,
-                date_acquired = assetDto.date_acquired,
-                asset_image = assetDto.asset_image,
-                owner_id = null,
-                history = new List<string>(),
-                date_created = DateTime.UtcNow
-            };
+                // Create a new Computer object if type matches one of the computer-related types
+                var computer = new Computer
+                {
+                    type = assetDto.type,
+                    asset_barcode = assetDto.asset_barcode,
+                    brand = assetDto.brand,
+                    model = assetDto.model,
+                    ram = assetDto.ram,
+                    ssd = assetDto.ssd,
+                    hdd = assetDto.hdd,
+                    gpu = assetDto.gpu,
+                    size = assetDto.size,
+                    color = assetDto.color,
+                    serial_no = assetDto.serial_no,
+                    po = assetDto.po,
+                    warranty = assetDto.warranty,
+                    cost = assetDto.cost,
+                    remarks = assetDto.remarks,
+                    li_description = liDescription,
+                    date_acquired = assetDto.date_acquired,
+                    asset_image = assetDto.asset_image,
+                    owner_id = null,
+                    history = new List<string>(),
+                    date_created = DateTime.UtcNow
+                };
 
-            // Add the asset to the database
-            _context.Assets.Add(asset);
-            await _context.SaveChangesAsync();
+                // Add the computer to the database
+                _context.computers.Add(computer);
+                await _context.SaveChangesAsync();
 
-            return asset;
+                return computer; // Return the created computer object
+            }
+            else
+            {
+                // Create a new Asset object for other types
+                var asset = new Asset
+                {
+                    type = assetDto.type,
+                    asset_barcode = assetDto.asset_barcode,
+                    brand = assetDto.brand,
+                    model = assetDto.model,
+                    ram = assetDto.ram,
+                    ssd = assetDto.ssd,
+                    hdd = assetDto.hdd,
+                    gpu = assetDto.gpu,
+                    size = assetDto.size,
+                    color = assetDto.color,
+                    serial_no = assetDto.serial_no,
+                    po = assetDto.po,
+                    warranty = assetDto.warranty,
+                    cost = assetDto.cost,
+                    remarks = assetDto.remarks,
+                    li_description = liDescription,
+                    date_acquired = assetDto.date_acquired,
+                    asset_image = assetDto.asset_image,
+                    owner_id = null,
+                    history = new List<string>(),
+                    date_created = DateTime.UtcNow
+                };
+
+                // Add the asset to the database
+                _context.Assets.Add(asset);
+                await _context.SaveChangesAsync();
+
+                return asset; // Return the created asset object
+            }
         }
+
 
 
         //for get by type endpoint 
