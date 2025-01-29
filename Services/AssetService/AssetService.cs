@@ -613,37 +613,70 @@ namespace IT_ASSET.Services.NewFolder
 
         //for get by type endpoint 
         public async Task<PaginatedResponse<Asset>> GetAssetsByTypeAsync(
-            string type,
-            int pageNumber = 1,
-            int pageSize = 10,
-            string sortOrder = "asc",
-            string? searchTerm = null)
+        string type,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string sortOrder = "asc",
+        string? searchTerm = null)
         {
-            var query = _context.Assets
+            // Query for Assets
+            var assetQuery = _context.Assets
                 .Where(a => a.type.ToLower() == type.ToLower())
                 .AsQueryable();
 
-            // Apply search filter if provided
+            // Query for Computers
+            var computerQuery = _context.computers
+                .Where(c => c.type.ToLower() == type.ToLower())
+                .AsQueryable();
+
+            // Apply search filter to both queries if provided
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                query = query.Where(asset =>
+                assetQuery = assetQuery.Where(asset =>
                     asset.asset_barcode.Contains(searchTerm) ||
                     asset.type.Contains(searchTerm) ||
                     asset.brand.Contains(searchTerm));
+
+                computerQuery = computerQuery.Where(computer =>
+                    computer.asset_barcode.Contains(searchTerm) ||
+                    computer.type.Contains(searchTerm) ||
+                    computer.brand.Contains(searchTerm) ||
+                    computer.serial_no.Contains(searchTerm) ||
+                    computer.model.Contains(searchTerm));
             }
 
+            // Combine the results of both queries into a single list
+            var combinedQuery = assetQuery
+                .Select(asset => new Asset
+                {
+                    id = asset.id,
+                    type = asset.type,
+                    asset_barcode = asset.asset_barcode,
+                    brand = asset.brand,
+                    // Map other fields as needed
+                })
+                .Union(computerQuery.Select(computer => new Asset
+                {
+                    id = computer.id,
+                    type = computer.type,
+                    asset_barcode = computer.asset_barcode,
+                    brand = computer.brand,
+                    // Map other fields as needed
+                }))
+                .AsQueryable();
+
             // Apply sorting based on the order
-            query = sortOrder.ToLower() switch
+            combinedQuery = sortOrder.ToLower() switch
             {
-                "desc" => query.OrderByDescending(asset => asset.id),
-                "asc" or _ => query.OrderBy(asset => asset.id),
+                "desc" => combinedQuery.OrderByDescending(a => a.id),
+                "asc" or _ => combinedQuery.OrderBy(a => a.id),
             };
 
             // Get the total count of the filtered and sorted assets
-            var totalItems = await query.CountAsync();
+            var totalItems = await combinedQuery.CountAsync();
 
             // Apply pagination (skip and take)
-            var paginatedData = await query
+            var paginatedData = await combinedQuery
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

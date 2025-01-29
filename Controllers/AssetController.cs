@@ -136,7 +136,7 @@ public class AssetsController : ControllerBase
         }
     }
 
-
+    //assign owner for vacant computer items
     [HttpPost("assign-owner-computer")]
     public async Task<IActionResult> AssignOwnerToComputer([FromBody] AssignOwnerforComputerDto assignOwnerforComputerDto)
     {
@@ -160,7 +160,7 @@ public class AssetsController : ControllerBase
     }
 
 
-    //post endpoint for creating vacant item for asset and computer items
+    //post endpoint for creating vacant item for asset and computer items store based on type
     [HttpPost("create-vacant-asset/computer-items")]
     public async Task<IActionResult> CreateVacantAsset([FromBody] CreateAssetDto assetDto)
     {
@@ -207,11 +207,11 @@ public class AssetsController : ControllerBase
 
     [HttpGet("type/{type}")]
     public async Task<IActionResult> GetAssetsByType(
-        string type,
-        int pageNumber = 1,
-        int pageSize = 10,
-        string sortOrder = "asc",
-        string? searchTerm = null)
+    string type,
+    int pageNumber = 1,
+    int pageSize = 10,
+    string sortOrder = "asc",
+    string? searchTerm = null)
     {
         try
         {
