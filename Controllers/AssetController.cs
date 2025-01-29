@@ -186,23 +186,38 @@ public class AssetsController : ControllerBase
 
 
 
-        [HttpGet("owner/{owner_id}")]
-        public async Task<IActionResult> GetAssetsByOwnerId(int owner_id)
+    [HttpGet("owner/{owner_id}")]
+    public async Task<IActionResult> GetAssetsByOwnerId(int owner_id)
+    {
+        try
         {
-        
+            // Query for Assets
             var assets = await _context.Assets
                 .Where(a => a.owner_id == owner_id)
                 .ToListAsync();
 
-        
-            if (assets == null || assets.Count == 0)
+            // Query for Computers
+            var computers = await _context.computers
+                .Where(c => c.owner_id == owner_id)
+                .ToListAsync();
+
+            // Combine the results into a single list
+            var combinedResults = new List<object>();
+            combinedResults.AddRange(assets);
+            combinedResults.AddRange(computers);
+
+            if (combinedResults.Count == 0)
             {
-                return NotFound(new { message = "No assets found for this owner." });
+                return NotFound(new { message = "No assets or computers found for this owner." });
             }
 
-        
-            return Ok(assets);
+            return Ok(combinedResults);
         }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error retrieving assets and computers: {ex.Message}");
+        }
+    }
 
 
     [HttpGet("type/{type}")]
