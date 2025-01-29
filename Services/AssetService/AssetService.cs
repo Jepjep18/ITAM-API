@@ -481,20 +481,20 @@ namespace IT_ASSET.Services.NewFolder
         public async Task<Asset> AssignOwnerToAssetAsync(AssignOwnerDto assignOwnerDto)
         {
             var asset = await _context.Assets
-                .FirstOrDefaultAsync(a => a.id == assignOwnerDto.AssetId && a.owner_id == null);
+                .FirstOrDefaultAsync(a => a.id == assignOwnerDto.asset_id && a.owner_id == null);
 
             if (asset == null)
             {
                 throw new KeyNotFoundException("Vacant asset not found or already has an owner.");
             }
 
-            var user = await _context.Users.FindAsync(assignOwnerDto.OwnerId);
+            var user = await _context.Users.FindAsync(assignOwnerDto.owner_id);
             if (user == null)
             {
                 throw new KeyNotFoundException("Owner not found.");
             }
 
-            asset.owner_id = assignOwnerDto.OwnerId;
+            asset.owner_id = assignOwnerDto.owner_id;
 
             _context.Assets.Update(asset);
             await _context.SaveChangesAsync();

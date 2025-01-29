@@ -33,8 +33,8 @@
 
     public class AssignOwnerDto
     {
-        public int AssetId { get; set; }  
-        public int OwnerId { get; set; }  
+        public int asset_id { get; set; }  
+        public int owner_id { get; set; }  
     }
 
     public class AssignOwnerforComputerDto
