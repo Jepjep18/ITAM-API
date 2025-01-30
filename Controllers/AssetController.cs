@@ -1,6 +1,7 @@
 ﻿using IT_ASSET.DTOs;
 using IT_ASSET.Models;
 using IT_ASSET.Models.Logs;
+using IT_ASSET.Services.ComputerService;
 using IT_ASSET.Services.NewFolder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,17 @@ public class AssetsController : ControllerBase
     private readonly AssetImportService _assetImportService;
     private readonly AssetService _assetService;
     private readonly UserService _userService;
+    private readonly ComputerService _computerService;
 
 
 
-    public AssetsController(AppDbContext context , AssetImportService assetImportService, AssetService assetService, UserService userService)
+    public AssetsController(AppDbContext context , AssetImportService assetImportService, AssetService assetService, UserService userService, ComputerService computerService)
     {
         _context = context;
         _assetImportService = assetImportService;
         _assetService = assetService;
         _userService = userService;
+        _computerService = computerService;
 
     }
 
@@ -248,7 +251,7 @@ public class AssetsController : ControllerBase
     }
 
 
-    [HttpGet]
+    [HttpGet("AssetItems")]
     public async Task<IActionResult> GetAllAssets(
         int pageNumber = 1,
         int pageSize = 10,
@@ -273,9 +276,34 @@ public class AssetsController : ControllerBase
             }
         }
 
+    [HttpGet("ComputerItems")]
+    public async Task<IActionResult> GetAllComputers(
+    int pageNumber = 1,
+    int pageSize = 10,
+    string sortOrder = "asc",
+    string? searchTerm = null)
+    {
+        try
+        {
+            // Delegate the logic to the ComputerService
+            var response = await _computerService.GetAllComputersAsync(pageNumber, pageSize, sortOrder, searchTerm);
+
+            if (response == null || !response.Items.Any())
+            {
+                return NotFound(new { message = "No computers found." });
+            }
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error retrieving computers: {ex.Message}");
+        }
+    }
 
 
-    [HttpGet("vacant")]
+
+    [HttpGet("assets/vacant")]
         public async Task<IActionResult> GetVacantAssets()
         {
             var vacantAssets = await _context.Assets
@@ -289,6 +317,21 @@ public class AssetsController : ControllerBase
 
             return Ok(vacantAssets);
         }
+
+    [HttpGet("computers/vacant")]
+    public async Task<IActionResult> GetVacantComputers()
+    {
+        var vacantComputers = await _context.computers
+            .Where(c => c.owner_id == null)
+            .ToListAsync();
+
+        if (vacantComputers == null || vacantComputers.Count == 0)
+        {
+            return NotFound(new { message = "No vacant computers available." });
+        }
+
+        return Ok(vacantComputers);
+    }
 
     [HttpPut("update-asset/{asset_id}")]
     public async Task<IActionResult> UpdateAsset(int asset_id, [FromBody] UpdateAssetDto assetDto)

@@ -1,3 +1,4 @@
+using IT_ASSET.Services.ComputerService;
 using IT_ASSET.Services.NewFolder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,7 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<AssetImportService>();
 builder.Services.AddScoped<AssetService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<ComputerService>();
 
 
 builder.Services.AddCors(options =>
