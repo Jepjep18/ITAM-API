@@ -809,6 +809,23 @@ namespace IT_ASSET.Services.NewFolder
             };
         }
 
+        //for get by id assets endpoint
+        public async Task<Asset?> GetAssetByIdAsync(int id)
+        {
+            try
+            {
+                var asset = await _context.Assets
+                    .FirstOrDefaultAsync(a => a.id == id); 
+
+                return asset;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (optional)
+                throw new Exception($"Error retrieving asset with ID {id}: {ex.Message}");
+            }
+        }
+
         public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId)
         {
             try

@@ -249,6 +249,24 @@ namespace IT_ASSET.Services.ComputerService
             }
         }
 
+        //for get computers by id endpoints
+        public async Task<Computer?> GetComputerByIdAsync(int id)
+        {
+            try
+            {
+                // Query the database to find the computer by ID
+                var computer = await _context.computers
+                    .FirstOrDefaultAsync(c => c.id == id); // Assuming 'Computers' is your DbSet
+
+                return computer;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (optional)
+                throw new Exception($"Error retrieving computer with ID {id}: {ex.Message}");
+            }
+        }
+
 
     }
 }

@@ -332,6 +332,50 @@ public class AssetsController : ControllerBase
         return Ok(vacantComputers);
     }
 
+    [HttpGet("AssetItems/{id}")]
+    public async Task<IActionResult> GetAssetById(int id)
+    {
+        try
+        {
+            // Delegate the logic to the AssetService to get asset by ID
+            var asset = await _assetService.GetAssetByIdAsync(id);
+
+            if (asset == null)
+            {
+                return NotFound(new { message = $"Asset with ID {id} not found." });
+            }
+
+            return Ok(asset);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error retrieving asset: {ex.Message}");
+        }
+    }
+
+    [HttpGet("Computers/{id}")]
+    public async Task<IActionResult> GetComputerById(int id)
+    {
+        try
+        {
+            // Delegate the logic to the ComputerService to get the computer by ID
+            var computer = await _computerService.GetComputerByIdAsync(id);
+
+            if (computer == null)
+            {
+                return NotFound(new { message = $"Computer with ID {id} not found." });
+            }
+
+            return Ok(computer);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error retrieving computer: {ex.Message}");
+        }
+    }
+
+
+
     [HttpPut("update-asset/{asset_id}")]
     public async Task<IActionResult> UpdateAsset(int asset_id, [FromBody] UpdateAssetDto assetDto)
     {
