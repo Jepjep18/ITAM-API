@@ -305,78 +305,120 @@ namespace IT_ASSET.Services.NewFolder
         //for asset upload image endpoint 
         public async Task<string> UploadAssetImageAsync(int assetId, IFormFile assetImage)
         {
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-            var fileExtension = Path.GetExtension(assetImage.FileName).ToLower();
-
-            if (!allowedExtensions.Contains(fileExtension))
+            try
             {
-                throw new ArgumentException("Invalid file type. Only images are allowed.");
-            }
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                var fileExtension = Path.GetExtension(assetImage.FileName).ToLower();
 
-            var asset = await _context.Assets.FindAsync(assetId);
-            if (asset == null)
+                if (!allowedExtensions.Contains(fileExtension))
+                {
+                    throw new ArgumentException("Invalid file type. Only images are allowed.");
+                }
+
+                // Find the asset by ID
+                var asset = await _context.Assets.FindAsync(assetId);
+                if (asset == null)
+                {
+                    throw new KeyNotFoundException("Asset not found.");
+                }
+
+                // Generate a unique file name
+                string uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(assetImage.FileName);
+
+                // Define the base directory for asset images
+                string baseDirectory = Path.Combine(@"C:\ITAM\assets\asset-images");  // Base path for asset images
+
+                // Create a subdirectory based on asset ID
+                string directoryPath = Path.Combine(baseDirectory, assetId.ToString());
+
+                // Ensure the directory exists
+                if (!Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                // Combine directory path and the unique file name to get the full file path
+                string filePath = Path.Combine(directoryPath, uniqueFileName).Replace("\\", "/");
+
+                // Save the file to the file system
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await assetImage.CopyToAsync(stream);
+                }
+
+                // Update the asset image path in the database
+                asset.asset_image = filePath;
+                _context.Assets.Update(asset);
+                await _context.SaveChangesAsync();
+
+                return filePath;  // Return the file path to the caller
+            }
+            catch (Exception ex)
             {
-                throw new KeyNotFoundException("Asset not found.");
+                // Handle errors
+                throw new Exception($"Error uploading asset image: {ex.Message}");
             }
-
-            var fileName = $"{assetId}_{Path.GetFileName(assetImage.FileName)}";
-            var directoryPath = @"C:\Users\JBARNADO\Desktop\ITAM\asset_image";
-            var filePath = Path.Combine(directoryPath, fileName);
-
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await assetImage.CopyToAsync(stream);
-            }
-
-            asset.asset_image = filePath;
-            _context.Assets.Update(asset);
-            await _context.SaveChangesAsync();
-
-            return filePath;
         }
+
 
         //for computer upload image endpoint
         public async Task<string> UploadComputerImageAsync(int computerId, IFormFile computerImage)
         {
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-            var fileExtension = Path.GetExtension(computerImage.FileName).ToLower();
-
-            if (!allowedExtensions.Contains(fileExtension))
+            try
             {
-                throw new ArgumentException("Invalid file type. Only images are allowed.");
-            }
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                var fileExtension = Path.GetExtension(computerImage.FileName).ToLower();
 
-            var computer = await _context.computers.FindAsync(computerId);
-            if (computer == null)
+                if (!allowedExtensions.Contains(fileExtension))
+                {
+                    throw new ArgumentException("Invalid file type. Only images are allowed.");
+                }
+
+                // Find the computer by ID
+                var computer = await _context.computers.FindAsync(computerId);
+                if (computer == null)
+                {
+                    throw new KeyNotFoundException("Computer not found.");
+                }
+
+                // Generate a unique file name
+                string uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(computerImage.FileName);
+
+                // Define the base directory for computer images
+                string baseDirectory = Path.Combine(@"C:\ITAM\assets\computer-images");  // Base path for computer images
+
+                // Create a subdirectory based on computer ID
+                string directoryPath = Path.Combine(baseDirectory, computerId.ToString());
+
+                // Ensure the directory exists
+                if (!Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                // Combine directory path and the unique file name to get the full file path
+                string filePath = Path.Combine(directoryPath, uniqueFileName).Replace("\\", "/");
+
+                // Save the file to the file system
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await computerImage.CopyToAsync(stream);
+                }
+
+                // Update the computer image path in the database
+                computer.asset_image = filePath;
+                _context.computers.Update(computer);
+                await _context.SaveChangesAsync();
+
+                return filePath;  // Return the file path to the caller
+            }
+            catch (Exception ex)
             {
-                throw new KeyNotFoundException("Computer not found.");
+                // Handle errors
+                throw new Exception($"Error uploading computer image: {ex.Message}");
             }
-
-            var fileName = $"{computerId}_{Path.GetFileName(computerImage.FileName)}";
-            var directoryPath = @"C:\Users\JBARNADO\Desktop\ITAM\computer_image";  
-            var filePath = Path.Combine(directoryPath, fileName);
-
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await computerImage.CopyToAsync(stream);
-            }
-
-            computer.asset_image = filePath; 
-            _context.computers.Update(computer);
-            await _context.SaveChangesAsync();
-
-            return filePath;  
         }
+
 
 
         //for create-vacant-asset/computer endpoint 
