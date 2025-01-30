@@ -23,13 +23,13 @@ namespace IT_ASSET.Services.NewFolder
 
             // Define the list of types to store in the Computer table
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "CPU",
-        "CPU CORE i7 10th GEN",
-        "CPU INTEL CORE i5",
-        "Laptop",
-        "Laptop Macbook AIR, NB 15S-DUI537TU"
-    };
+            {
+                "CPU",
+                "CPU CORE i7 10th GEN",
+                "CPU INTEL CORE i5",
+                "Laptop",
+                "Laptop Macbook AIR, NB 15S-DUI537TU"
+            };
 
             // Initialize counters for accountability and tracking codes
             int accountabilityCodeCounter = 1;
@@ -59,15 +59,15 @@ namespace IT_ASSET.Services.NewFolder
 
                     // Get history data from columns 19 to 25
                     var history = new List<string>
-            {
-                GetCellValue(worksheet.Cells[row, 19]),
-                GetCellValue(worksheet.Cells[row, 20]),
-                GetCellValue(worksheet.Cells[row, 21]),
-                GetCellValue(worksheet.Cells[row, 22]),
-                GetCellValue(worksheet.Cells[row, 23]),
-                GetCellValue(worksheet.Cells[row, 24]),
-                GetCellValue(worksheet.Cells[row, 25])
-            };
+                    {
+                        GetCellValue(worksheet.Cells[row, 19]),
+                        GetCellValue(worksheet.Cells[row, 20]),
+                        GetCellValue(worksheet.Cells[row, 21]),
+                        GetCellValue(worksheet.Cells[row, 22]),
+                        GetCellValue(worksheet.Cells[row, 23]),
+                        GetCellValue(worksheet.Cells[row, 24]),
+                        GetCellValue(worksheet.Cells[row, 25])
+                    };
 
                     // Remove any null or empty history values
                     history.RemoveAll(item => string.IsNullOrWhiteSpace(item));

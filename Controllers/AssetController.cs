@@ -38,18 +38,17 @@ public class AssetsController : ControllerBase
     public async Task<IActionResult> ImportAssets(IFormFile file)
     {
         if (file == null || file.Length == 0)
-            return BadRequest("No file uploaded.");
+            return BadRequest(new { message = "No file uploaded." });
 
         try
         {
-            // Delegate the logic of importing assets to the service
+            // Simulate importing assets
             var result = await _assetImportService.ImportAssetsAsync(file);
-
-            return Ok(result); // Return the success message from the service
+            return Ok(new { message = result }); // JSON response
         }
         catch (Exception ex)
         {
-            return BadRequest($"Error importing assets: {ex.Message}");
+            return BadRequest(new { message = $"Error importing assets: {ex.Message}" });
         }
     }
 
