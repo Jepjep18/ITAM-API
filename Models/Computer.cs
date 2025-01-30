@@ -32,5 +32,9 @@ namespace IT_ASSET.Models
         public User? owner { get; set; }
         public DateTime? date_created { get; set; }
         public DateTime? date_modified { get; set; }
+
+        [JsonIgnore]
+        public ICollection<ComputerComponents> Components { get; set; }
+
     }
 }

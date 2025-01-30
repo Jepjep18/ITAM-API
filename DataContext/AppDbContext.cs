@@ -60,6 +60,13 @@ public class AppDbContext : DbContext
             .HasForeignKey(cc => cc.owner_id)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Configure the relationship between ComputerComponents and Computer
+        modelBuilder.Entity<ComputerComponents>()
+            .HasOne(cc => cc.computer) // ComputerComponents has one Computer
+            .WithMany(c => c.Components) // Computer has many ComputerComponents
+            .HasForeignKey(cc => cc.computer_id) // Foreign key is computer_id
+            .OnDelete(DeleteBehavior.NoAction); // Disable cascade delete
+
 
         //modelBuilder.Entity<UserAccountabilityList>()
         //    .HasOne(ual => ual.asset)

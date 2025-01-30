@@ -363,6 +363,36 @@ public class AssetsController : ControllerBase
     }
 
 
+    [HttpPut("update-computer/{computer_id}")]
+    public async Task<IActionResult> UpdateComputer(int computer_id, [FromBody] UpdateComputerDto computerDto)
+    {
+        if (computerDto == null)
+        {
+            return BadRequest("Invalid data.");
+        }
+
+        try
+        {
+            // Step 1: Delegate user handling logic to UserService
+            var ownerId = await _userService.GetOrCreateUserAsync(computerDto);
+
+            // Step 2: Delegate computer update logic to ComputerService
+            var updatedComputer = await _computerService.UpdateComputerAsync(computer_id, computerDto, ownerId);
+
+            if (updatedComputer == null)
+            {
+                return NotFound(new { message = "Computer not found." });
+            }
+
+            return Ok(new { message = "Computer updated successfully.", computer = updatedComputer });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error updating computer: {ex.Message}");
+        }
+    }
+
+
 
     [HttpDelete("delete-asset/{id}")]
     public async Task<IActionResult> DeleteAsset(int id)

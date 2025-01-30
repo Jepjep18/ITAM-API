@@ -23,13 +23,13 @@ namespace IT_ASSET.Services.NewFolder
 
             // Define the list of types to store in the Computer table
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "CPU",
-                "CPU CORE i7 10th GEN",
-                "CPU INTEL CORE i5",
-                "Laptop",
-                "Laptop Macbook AIR, NB 15S-DUI537TU"
-            };
+    {
+        "CPU",
+        "CPU CORE i7 10th GEN",
+        "CPU INTEL CORE i5",
+        "Laptop",
+        "Laptop Macbook AIR, NB 15S-DUI537TU"
+    };
 
             // Initialize counters for accountability and tracking codes
             int accountabilityCodeCounter = 1;
@@ -59,15 +59,15 @@ namespace IT_ASSET.Services.NewFolder
 
                     // Get history data from columns 19 to 25
                     var history = new List<string>
-                    {
-                        GetCellValue(worksheet.Cells[row, 19]),
-                        GetCellValue(worksheet.Cells[row, 20]),
-                        GetCellValue(worksheet.Cells[row, 21]),
-                        GetCellValue(worksheet.Cells[row, 22]),
-                        GetCellValue(worksheet.Cells[row, 23]),
-                        GetCellValue(worksheet.Cells[row, 24]),
-                        GetCellValue(worksheet.Cells[row, 25])
-                    };
+            {
+                GetCellValue(worksheet.Cells[row, 19]),
+                GetCellValue(worksheet.Cells[row, 20]),
+                GetCellValue(worksheet.Cells[row, 21]),
+                GetCellValue(worksheet.Cells[row, 22]),
+                GetCellValue(worksheet.Cells[row, 23]),
+                GetCellValue(worksheet.Cells[row, 24]),
+                GetCellValue(worksheet.Cells[row, 25])
+            };
 
                     // Remove any null or empty history values
                     history.RemoveAll(item => string.IsNullOrWhiteSpace(item));
@@ -105,7 +105,7 @@ namespace IT_ASSET.Services.NewFolder
                             await _context.SaveChangesAsync();
 
                             // After storing the computer, store the components in computer_components table
-                            await StoreInComputerComponentsAsync(worksheet, row, assetType, user);
+                            await StoreInComputerComponentsAsync(worksheet, row, assetType, user, computer);
 
                             // Update the UserAccountabilityList with accountability and tracking codes for Computer
                             var (updatedAccountabilityCodeCounter, updatedTrackingCodeCounter) =
@@ -225,7 +225,7 @@ namespace IT_ASSET.Services.NewFolder
 
 
         // Method to store components like RAM, SSD, etc., in the ComputerComponents table
-        private async Task StoreInComputerComponentsAsync(ExcelWorksheet worksheet, int row, string assetType, User user)
+        private async Task StoreInComputerComponentsAsync(ExcelWorksheet worksheet, int row, string assetType, User user, Computer computer)
         {
             var assetBarcode = worksheet.Cells[row, 6].Text.Trim(); // Assuming barcode is in column 6
             var ownerId = user.id;
@@ -270,7 +270,8 @@ namespace IT_ASSET.Services.NewFolder
                         asset_barcode = assetBarcode,
                         status = ownerId != null ? "Released" : "New",
                         history = new List<string>(history), // Assign the same history data to each component
-                        owner_id = ownerId
+                        owner_id = ownerId,
+                        computer_id = computer.id // Set the computer_id foreign key
                     };
 
                     _context.computer_components.Add(component);

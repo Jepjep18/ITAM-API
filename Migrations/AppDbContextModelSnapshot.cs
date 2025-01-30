@@ -212,6 +212,9 @@ namespace IT_ASSET.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("computer_id")
+                        .HasColumnType("int");
+
                     b.Property<string>("description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -230,6 +233,8 @@ namespace IT_ASSET.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("id");
+
+                    b.HasIndex("computer_id");
 
                     b.HasIndex("owner_id");
 
@@ -404,10 +409,17 @@ namespace IT_ASSET.Migrations
 
             modelBuilder.Entity("IT_ASSET.Models.ComputerComponents", b =>
                 {
+                    b.HasOne("IT_ASSET.Models.Computer", "computer")
+                        .WithMany("Components")
+                        .HasForeignKey("computer_id")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("User", "owner")
                         .WithMany("computer_components")
                         .HasForeignKey("owner_id")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("computer");
 
                     b.Navigation("owner");
                 });
@@ -443,6 +455,11 @@ namespace IT_ASSET.Migrations
                         .IsRequired();
 
                     b.Navigation("owner");
+                });
+
+            modelBuilder.Entity("IT_ASSET.Models.Computer", b =>
+                {
+                    b.Navigation("Components");
                 });
 
             modelBuilder.Entity("IT_ASSET.Models.UserAccountabilityList", b =>

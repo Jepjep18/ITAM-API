@@ -3,6 +3,7 @@ using IT_ASSET.Services.NewFolder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 var corsPolicyName = "AllowSpecificOrigins";
@@ -10,7 +11,11 @@ var corsPolicyName = "AllowSpecificOrigins";
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers() // Remove the semicolon here
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
+    });
 
 // Register the services
 //builder.Services.AddScoped<IAssetService, AssetService>();

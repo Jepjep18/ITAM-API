@@ -1,0 +1,73 @@
+﻿using System.ComponentModel.DataAnnotations;
+using static IT_ASSET.DTOs.UpdateComputerDto;
+
+namespace IT_ASSET.DTOs
+{
+    public class ComputerDto
+    {
+        public int id { get; set; }
+        public string type { get; set; }
+        public string asset_barcode { get; set; }
+        public string brand { get; set; }
+        public string model { get; set; }
+        public string ram { get; set; }
+        public string ssd { get; set; }
+        public string hdd { get; set; }
+        public string gpu { get; set; }
+        public string size { get; set; }
+        public string color { get; set; }
+        public string serial_no { get; set; }
+        public string po { get; set; }
+        public string warranty { get; set; }
+        public decimal cost { get; set; }
+        public string remarks { get; set; }
+        public int? owner_id { get; set; }
+        public List<string> history { get; set; }
+        public DateTime date_created { get; set; }
+        public List<ComputerComponentDto> Components { get; set; }
+    }
+
+    public class UpdateComputerDto
+    {
+        public string user_name { get; set; }
+        public string company { get; set; }
+        public string department { get; set; }
+        public string? employee_id { get; set; }
+        public string type { get; set; }
+        public string date_acquired { get; set; }
+        public string asset_barcode { get; set; }
+        public string brand { get; set; }
+        public string model { get; set; }
+        public string ram { get; set; }
+        public string ssd { get; set; }
+        public string hdd { get; set; }
+        public string gpu { get; set; }
+        public string size { get; set; }
+        public string color { get; set; }
+        public string serial_no { get; set; }
+        public string po { get; set; }
+        public string warranty { get; set; }
+        public decimal cost { get; set; }
+        public string remarks { get; set; }
+        public List<string> history { get; set; }
+        public string li_description { get; set; }
+
+        // Computer components
+        public List<ComputerComponentDto>? computer_components
+        {
+            get; set;
+        }
+
+        public class ComputerComponentDto
+        {
+            public int id { get; set; }
+            public string type { get; set; }
+            public string description { get; set; }
+            public string asset_barcode { get; set; }
+            public string? status { get; set; }
+            public List<string>? history { get; set; }
+            public int? owner_id { get; set; }
+            public int? computer_id { get; set; }
+        }
+    }
+}

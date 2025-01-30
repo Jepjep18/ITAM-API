@@ -55,5 +55,200 @@ namespace IT_ASSET.Services.ComputerService
                 PageSize = pageSize
             };
         }
+
+
+        public async Task<Computer> UpdateComputerAsync(int computerId, UpdateComputerDto computerDto, int ownerId)
+        {
+            try
+            {
+                var computer = await _context.computers.FirstOrDefaultAsync(c => c.id == computerId);
+
+                if (computer == null)
+                {
+                    return null; // Computer not found
+                }
+
+                // Maintain history if the owner is changing
+                if (computer.owner_id != ownerId)
+                {
+                    if (computer.history == null)
+                    {
+                        computer.history = new List<string>();
+                    }
+
+                    // Only add to history if there was a previous owner
+                    if (computer.owner_id.HasValue) // Check if owner_id is not null
+                    {
+                        var previousOwnerName = await _context.Users
+                            .Where(u => u.id == computer.owner_id)
+                            .Select(u => u.name)
+                            .FirstOrDefaultAsync();
+
+                        string previousOwner = previousOwnerName ?? "Unknown";
+                        computer.history.Add(previousOwner);
+
+                        // Remove the computer from the previous owner's accountability list
+                        var previousOwnerAccountability = await _context.user_accountability_lists
+                            .FirstOrDefaultAsync(al => al.owner_id == computer.owner_id);
+
+                        if (previousOwnerAccountability != null)
+                        {
+                            var computerIds = previousOwnerAccountability.computer_ids?
+                                .Split(',')
+                                .Where(id => id != computerId.ToString())
+                                .ToList();
+
+                            previousOwnerAccountability.computer_ids = computerIds != null && computerIds.Any()
+                                ? string.Join(",", computerIds)
+                                : null;
+
+                            if (string.IsNullOrWhiteSpace(previousOwnerAccountability.asset_ids) &&
+                                string.IsNullOrWhiteSpace(previousOwnerAccountability.computer_ids))
+                            {
+                                _context.user_accountability_lists.Remove(previousOwnerAccountability);
+                            }
+                            else
+                            {
+                                _context.user_accountability_lists.Update(previousOwnerAccountability);
+                            }
+                        }
+                    }
+
+                    var newOwnerAccountability = await _context.user_accountability_lists
+                        .FirstOrDefaultAsync(al => al.owner_id == ownerId);
+
+                    if (newOwnerAccountability == null)
+                    {
+                        var lastAccountability = await _context.user_accountability_lists
+                            .OrderByDescending(al => al.id)
+                            .FirstOrDefaultAsync();
+
+                        int lastAccountabilityNumber = 0;
+                        int lastTrackingNumber = 0;
+
+                        if (lastAccountability != null)
+                        {
+                            var lastAccountabilityCode = lastAccountability.accountability_code;
+                            var lastTrackingCode = lastAccountability.tracking_code;
+
+                            if (lastAccountabilityCode != null && lastAccountabilityCode.StartsWith("ACID-"))
+                            {
+                                lastAccountabilityNumber = int.Parse(lastAccountabilityCode.Substring(5));
+                            }
+
+                            if (lastTrackingCode != null && lastTrackingCode.StartsWith("TRID-"))
+                            {
+                                lastTrackingNumber = int.Parse(lastTrackingCode.Substring(5));
+                            }
+                        }
+
+                        int newAccountabilityNumber = lastAccountabilityNumber + 1;
+                        int newTrackingNumber = lastTrackingNumber + 1;
+
+                        string newAccountabilityCode = $"ACID-{newAccountabilityNumber:D4}";
+                        string newTrackingCode = $"TRID-{newTrackingNumber:D4}";
+
+                        var newAccountabilityList = new UserAccountabilityList
+                        {
+                            owner_id = ownerId,
+                            accountability_code = newAccountabilityCode,
+                            tracking_code = newTrackingCode,
+                            computer_ids = computer.id.ToString(),
+                        };
+
+                        await _context.user_accountability_lists.AddAsync(newAccountabilityList);
+                    }
+                    else
+                    {
+                        newOwnerAccountability.computer_ids = string.IsNullOrWhiteSpace(newOwnerAccountability.computer_ids)
+                            ? computer.id.ToString()
+                            : $"{newOwnerAccountability.computer_ids},{computer.id}";
+
+                        _context.user_accountability_lists.Update(newOwnerAccountability);
+                    }
+                }
+
+                // Update the computer properties
+                computer.type = computerDto.type;
+                computer.date_acquired = computerDto.date_acquired;
+                computer.asset_barcode = computerDto.asset_barcode;
+                computer.brand = computerDto.brand;
+                computer.model = computerDto.model;
+                computer.ram = computerDto.ram;
+                computer.ssd = computerDto.ssd;
+                computer.hdd = computerDto.hdd;
+                computer.gpu = computerDto.gpu;
+                computer.size = computerDto.size;
+                computer.color = computerDto.color;
+                computer.serial_no = computerDto.serial_no;
+                computer.po = computerDto.po;
+                computer.warranty = computerDto.warranty;
+                computer.cost = computerDto.cost;
+                computer.remarks = computerDto.remarks;
+                computer.owner_id = ownerId; // Update owner_id
+
+                _context.computers.Update(computer);
+
+                // Update the ComputerComponents table for the relevant components
+                await UpdateComputerComponentsAsync(computer, ownerId);
+
+                await _context.SaveChangesAsync();
+
+                return computer;
+            }
+            catch (DbUpdateException dbEx)
+            {
+                throw new Exception($"Database error: {dbEx.InnerException?.Message}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Unexpected error: {ex.Message}");
+            }
+        }
+
+        private async Task UpdateComputerComponentsAsync(Computer computer, int ownerId)
+        {
+            var components = await _context.computer_components
+                .Where(c => c.computer_id == computer.id)
+                .ToListAsync();
+
+            foreach (var component in components)
+            {
+                // If the component's owner_id is different, update it
+                if (component.owner_id != ownerId)
+                {
+                    component.owner_id = ownerId;
+                }
+
+                // Update the component's status if owner_id is not null (i.e., assigned)
+                if (component.owner_id != null)
+                {
+                    component.status = "Released"; // Update the status to 'Released' when an owner is assigned
+                }
+
+                // Update component details if necessary (e.g., RAM, SSD, HDD, GPU)
+                if (component.type == "RAM" && computer.ram != component.description)
+                {
+                    component.description = computer.ram;
+                }
+                else if (component.type == "SSD" && computer.ssd != component.description)
+                {
+                    component.description = computer.ssd;
+                }
+                else if (component.type == "HDD" && computer.hdd != component.description)
+                {
+                    component.description = computer.hdd;
+                }
+                else if (component.type == "GPU" && computer.gpu != component.description)
+                {
+                    component.description = computer.gpu;
+                }
+
+                // Update the component in the database
+                _context.computer_components.Update(component);
+            }
+        }
+
+
     }
 }

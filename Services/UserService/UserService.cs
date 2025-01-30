@@ -75,5 +75,36 @@ namespace IT_ASSET.Services.NewFolder
                 return newUser.id; // Return the new user's id
             }
         }
+
+        public async Task<int> GetOrCreateUserAsync(UpdateComputerDto computerDto)
+        {
+            // Check if the user already exists
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.name == computerDto.user_name
+                                       && u.company == computerDto.company
+                                       && u.department == computerDto.department
+                                       && u.employee_id == computerDto.employee_id);
+
+            if (existingUser != null)
+            {
+                return existingUser.id; // Return the existing user's id
+            }
+            else
+            {
+                // Create a new user if not found
+                var newUser = new User
+                {
+                    name = computerDto.user_name,
+                    company = computerDto.company,
+                    department = computerDto.department,
+                    employee_id = computerDto.employee_id
+                };
+
+                _context.Users.Add(newUser);
+                await _context.SaveChangesAsync();
+
+                return newUser.id; // Return the new user's id
+            }
+        }
     }
 }

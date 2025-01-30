@@ -384,13 +384,13 @@ namespace IT_ASSET.Services.NewFolder
         {
             // Define types that should go to the computer database
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "CPU",
-                "CPU CORE i7 10th GEN",
-                "CPU INTEL CORE i5",
-                "Laptop",
-                "Laptop Macbook AIR, NB 15S-DUI537TU"
-            };
+    {
+        "CPU",
+        "CPU CORE i7 10th GEN",
+        "CPU INTEL CORE i5",
+        "Laptop",
+        "Laptop Macbook AIR, NB 15S-DUI537TU"
+    };
 
             var liDescription = string.Join(" ",
                 assetDto.brand?.Trim(),
@@ -440,6 +440,9 @@ namespace IT_ASSET.Services.NewFolder
                 _context.computers.Add(computer);
                 await _context.SaveChangesAsync();
 
+                // Store the computer components in the computer_components table
+                await StoreComputerComponentsAsync(computer, assetDto);
+
                 return computer;
             }
             else
@@ -473,9 +476,80 @@ namespace IT_ASSET.Services.NewFolder
                 _context.Assets.Add(asset);
                 await _context.SaveChangesAsync();
 
-                return asset; 
+                return asset;
             }
         }
+
+        private async Task StoreComputerComponentsAsync(Computer computer, CreateAssetDto assetDto)
+        {
+            // Create a list of components based on the computer's properties
+            var components = new List<ComputerComponents>();
+
+            // Add RAM as a component if it exists
+            if (!string.IsNullOrWhiteSpace(computer.ram))
+            {
+                components.Add(new ComputerComponents
+                {
+                    type = "RAM",
+                    description = computer.ram,
+                    asset_barcode = $"{computer.asset_barcode}",
+                    status = "Available",
+                    owner_id = null, // Vacant asset, so no owner
+                    history = new List<string>(),
+                    computer_id = computer.id // Set the computer_id foreign key
+                });
+            }
+
+            // Add SSD as a component if it exists
+            if (!string.IsNullOrWhiteSpace(computer.ssd))
+            {
+                components.Add(new ComputerComponents
+                {
+                    type = "SSD",
+                    description = computer.ssd,
+                    asset_barcode = $"{computer.asset_barcode}",
+                    status = "Available",
+                    owner_id = null, // Vacant asset, so no owner
+                    history = new List<string>(),
+                    computer_id = computer.id // Set the computer_id foreign key
+                });
+            }
+
+            // Add HDD as a component if it exists
+            if (!string.IsNullOrWhiteSpace(computer.hdd))
+            {
+                components.Add(new ComputerComponents
+                {
+                    type = "HDD",
+                    description = computer.hdd,
+                    asset_barcode = $"{computer.asset_barcode}",
+                    status = "Available",
+                    owner_id = null, // Vacant asset, so no owner
+                    history = new List<string>(),
+                    computer_id = computer.id // Set the computer_id foreign key
+                });
+            }
+
+            // Add GPU as a component if it exists
+            if (!string.IsNullOrWhiteSpace(computer.gpu))
+            {
+                components.Add(new ComputerComponents
+                {
+                    type = "GPU",
+                    description = computer.gpu,
+                    asset_barcode = $"{computer.asset_barcode}",
+                    status = "Available",
+                    owner_id = null, // Vacant asset, so no owner
+                    history = new List<string>(),
+                    computer_id = computer.id // Set the computer_id foreign key
+                });
+            }
+
+            // Add all components to the database
+            _context.computer_components.AddRange(components);
+            await _context.SaveChangesAsync();
+        }
+
 
         //for assigning user for vacant-asset items
         public async Task<Asset> AssignOwnerToAssetAsync(AssignOwnerDto assignOwnerDto)

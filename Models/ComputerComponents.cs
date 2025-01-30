@@ -1,4 +1,6 @@
-﻿namespace IT_ASSET.Models
+﻿using System.Text.Json.Serialization;
+
+namespace IT_ASSET.Models
 {
     public class ComputerComponents
     {
@@ -11,6 +13,10 @@
         public int? owner_id { get; set; }
         public User owner { get; set; }
 
+        // Add computer_id as a foreign key
+        public int? computer_id { get; set; }
 
+        [JsonIgnore]
+        public Computer computer { get; set; }
     }
 }
