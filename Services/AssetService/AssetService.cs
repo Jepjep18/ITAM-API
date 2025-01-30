@@ -1040,6 +1040,52 @@ namespace IT_ASSET.Services.NewFolder
         }
 
 
+        //for get asset filename endpoint
+        public async Task<string> GetAssetImageByFilenameAsync(string filename)
+        {
+            try
+            {
+                // Define the base directory for asset images
+                string baseDirectory = @"C:\ITAM\assets\asset-images";
+
+                // Get all subdirectories in the base directory
+                var directories = Directory.GetDirectories(baseDirectory);
+                string filePath = null;
+
+                // Search for the file in all subdirectories
+                foreach (var directory in directories)
+                {
+                    var potentialPath = Path.Combine(directory, filename);
+                    if (File.Exists(potentialPath))
+                    {
+                        filePath = potentialPath;
+                        break;
+                    }
+                }
+
+                // If file is not found in any subdirectory
+                if (filePath == null)
+                {
+                    Console.WriteLine($"File not found. Searched in all subdirectories of: {baseDirectory}");
+                    Console.WriteLine($"Filename searched for: {filename}");
+                    Console.WriteLine($"Available directories: {string.Join(", ", directories)}");
+
+                    throw new FileNotFoundException($"Asset image '{filename}' not found in any asset directory");
+                }
+
+                return filePath;
+            }
+            catch (Exception ex)
+            {
+                // Add more context to the error
+                Console.WriteLine($"Error details: {ex}");
+                throw new Exception($"Error fetching asset image: {ex.Message}", ex);
+            }
+        }
+
+
+
+
 
 
     }

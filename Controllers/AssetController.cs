@@ -375,6 +375,97 @@ public class AssetsController : ControllerBase
     }
 
 
+    //for get asset filename endpoint
+    [HttpGet("asset-image/{filename}")]
+    public IActionResult GetAssetImage(string filename)
+    {
+        try
+        {
+            // Call the service to get the asset image file path
+            var filePath = _assetService.GetAssetImageByFilenameAsync(filename).Result;
+
+            Console.WriteLine($"Requested filename: '{filename}'");
+            Console.WriteLine($"Looking for file at: {filePath}");
+
+            // Determine content type based on file extension
+            var fileExtension = Path.GetExtension(filename).ToLowerInvariant();
+            string contentType = fileExtension switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".bmp" => "image/bmp",
+                ".webp" => "image/webp",
+                _ => "application/octet-stream"
+            };
+
+            // Open the file as a stream and return it
+            var image = System.IO.File.OpenRead(filePath);
+            return File(image, contentType);
+        }
+        catch (FileNotFoundException fnfEx)
+        {
+            return NotFound(new { message = fnfEx.Message });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error occurred: {ex.Message}");
+            return StatusCode(500, new
+            {
+                message = "An error occurred while processing the request",
+                error = ex.Message
+            });
+        }
+    }
+
+
+
+    //for get computer filename endpoint
+    [HttpGet("computer-image/{filename}")]
+    public IActionResult GetComputerImage(string filename)
+    {
+        try
+        {
+            // Call the service to get the computer image file path
+            var filePath = _computerService.GetComputerImageByFilenameAsync(filename).Result;
+
+            Console.WriteLine($"Requested filename: '{filename}'");
+            Console.WriteLine($"Looking for file at: {filePath}");
+
+            // Determine content type based on file extension
+            var fileExtension = Path.GetExtension(filename).ToLowerInvariant();
+            string contentType = fileExtension switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".bmp" => "image/bmp",
+                ".webp" => "image/webp",
+                _ => "application/octet-stream"
+            };
+
+            // Open the file as a stream and return it
+            var image = System.IO.File.OpenRead(filePath);
+            return File(image, contentType);
+        }
+        catch (FileNotFoundException fnfEx)
+        {
+            return NotFound(new { message = fnfEx.Message });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error occurred: {ex.Message}");
+            return StatusCode(500, new
+            {
+                message = "An error occurred while processing the request",
+                error = ex.Message
+            });
+        }
+    }
+
+
+
+
 
     [HttpPut("update-asset/{asset_id}")]
     public async Task<IActionResult> UpdateAsset(int asset_id, [FromBody] UpdateAssetDto assetDto)

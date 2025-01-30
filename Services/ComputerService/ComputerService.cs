@@ -268,5 +268,59 @@ namespace IT_ASSET.Services.ComputerService
         }
 
 
+        //for get computer filename endpoint
+        public async Task<string> GetComputerImageByFilenameAsync(string filename)
+        {
+            try
+            {
+                // Define the base directory for computer images
+                string baseDirectory = @"C:\ITAM\assets\computer-images";
+
+                // Get all subdirectories in the base directory
+                var directories = Directory.GetDirectories(baseDirectory);
+                string filePath = null;
+
+                // First try the root directory
+                var rootPath = Path.Combine(baseDirectory, filename);
+                if (File.Exists(rootPath))
+                {
+                    filePath = rootPath;
+                }
+                else
+                {
+                    // If not in root, search through all subdirectories
+                    foreach (var directory in directories)
+                    {
+                        var potentialPath = Path.Combine(directory, filename);
+                        if (File.Exists(potentialPath))
+                        {
+                            filePath = potentialPath;
+                            break;
+                        }
+                    }
+                }
+
+                // If file is not found anywhere
+                if (filePath == null)
+                {
+                    Console.WriteLine($"File not found. Searched in base directory and all subdirectories of: {baseDirectory}");
+                    Console.WriteLine($"Filename searched for: {filename}");
+                    Console.WriteLine($"Available directories: {string.Join(", ", directories)}");
+
+                    throw new FileNotFoundException($"Computer image '{filename}' not found in any directory");
+                }
+
+                return filePath;
+            }
+            catch (Exception ex)
+            {
+                // Add more context to the error
+                Console.WriteLine($"Error details: {ex}");
+                throw new Exception($"Error fetching computer image: {ex.Message}", ex);
+            }
+        }
+
+
+
     }
 }
