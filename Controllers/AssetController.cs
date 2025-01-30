@@ -55,7 +55,7 @@ public class AssetsController : ControllerBase
 
 
     //add either assets item or computer item based on type
-    [HttpPost("add-asset")]
+    [HttpPost("add-asset/computer")]
     public async Task<IActionResult> AddAsset([FromBody] AddAssetDto assetDto)
     {
         if (assetDto == null)

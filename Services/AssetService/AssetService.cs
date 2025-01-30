@@ -735,114 +735,178 @@ namespace IT_ASSET.Services.NewFolder
             };
         }
 
-        //for update endpoint 
         public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId)
         {
-            // Fetch the asset from the database
-            var asset = await _context.Assets.FirstOrDefaultAsync(a => a.id == assetId);
-
-            if (asset == null)
+            try
             {
-                return null; // Asset not found
-            }
+                var asset = await _context.Assets.FirstOrDefaultAsync(a => a.id == assetId);
 
-            // Maintain history if the owner is changing
-            if (asset.owner_id != ownerId)
-            {
-                // Ensure that the history list is initialized
-                if (asset.history == null)
+                if (asset == null)
                 {
-                    asset.history = new List<string>();
+                    return null; // Asset not found
                 }
 
-                // Fetch previous owner details
-                var previousOwnerName = await _context.Users
-                    .Where(u => u.id == asset.owner_id)
-                    .Select(u => u.name)
-                    .FirstOrDefaultAsync();
-
-                string previousOwner = previousOwnerName ?? "Unknown";
-                string newHistoryEntry = $"{previousOwner}";
-
-                // Add new entry to history
-                asset.history.Add(newHistoryEntry);
-
-                // Ensure accountability list is initialized for the new owner
-                var ownerAccountability = await _context.user_accountability_lists
-                    .FirstOrDefaultAsync(al => al.owner_id == ownerId);
-
-                if (ownerAccountability == null)
+                // Check if the owner is changing
+                if (asset.owner_id != ownerId)
                 {
-                    // Create new accountability list if not exists
-                    var newAccountabilityList = new UserAccountabilityList
+                    if (asset.history == null)
                     {
-                        owner_id = ownerId,
-                        asset_ids = asset.id.ToString(), // Ensure it's in a format that you need (string)
-                        assets = new List<Asset> { asset } // Add asset to the list
-                    };
+                        asset.history = new List<string>();
+                    }
 
-                    _context.user_accountability_lists.Add(newAccountabilityList);
-                }
-                else
-                {
-                    // Ensure asset_ids is not null or empty
-                    if (string.IsNullOrWhiteSpace(ownerAccountability.asset_ids))
+                    // Only add to history if there was a previous owner
+                    if (asset.owner_id.HasValue) // Check if owner_id is not null
                     {
-                        ownerAccountability.asset_ids = asset.id.ToString(); // Initialize if empty
+                        var previousOwnerName = await _context.Users
+                            .Where(u => u.id == asset.owner_id)
+                            .Select(u => u.name)
+                            .FirstOrDefaultAsync();
+
+                        string previousOwner = previousOwnerName ?? "Unknown";
+                        asset.history.Add(previousOwner);
+
+                        // Remove the asset from the previous owner's accountability list
+                        var previousOwnerAccountability = await _context.user_accountability_lists
+                            .FirstOrDefaultAsync(al => al.owner_id == asset.owner_id);
+
+                        if (previousOwnerAccountability != null)
+                        {
+                            // Remove the asset ID from the previous owner's asset_ids
+                            var assetIds = previousOwnerAccountability.asset_ids?
+                                .Split(',')
+                                .Where(id => id != assetId.ToString())
+                                .ToList();
+
+                            previousOwnerAccountability.asset_ids = assetIds != null && assetIds.Any()
+                                ? string.Join(",", assetIds)
+                                : null;
+
+                            // Remove the asset from the previous owner's assets list
+                            previousOwnerAccountability.assets?.Remove(asset);
+
+                            // If the previous owner's accountability list is empty, remove it
+                            if (string.IsNullOrWhiteSpace(previousOwnerAccountability.asset_ids))
+                            {
+                                _context.user_accountability_lists.Remove(previousOwnerAccountability);
+                            }
+                            else
+                            {
+                                _context.user_accountability_lists.Update(previousOwnerAccountability);
+                            }
+                        }
+                    }
+
+                    // Check if the new owner already has an accountability list
+                    var newOwnerAccountability = await _context.user_accountability_lists
+                        .FirstOrDefaultAsync(al => al.owner_id == ownerId);
+
+                    if (newOwnerAccountability == null)
+                    {
+                        // Fetch the last accountability_code and tracking_code
+                        var lastAccountability = await _context.user_accountability_lists
+                            .OrderByDescending(al => al.id)
+                            .FirstOrDefaultAsync();
+
+                        int lastAccountabilityNumber = 0;
+                        int lastTrackingNumber = 0;
+
+                        if (lastAccountability != null)
+                        {
+                            // Extract the last numbers from accountability_code and tracking_code
+                            var lastAccountabilityCode = lastAccountability.accountability_code;
+                            var lastTrackingCode = lastAccountability.tracking_code;
+
+                            if (lastAccountabilityCode != null && lastAccountabilityCode.StartsWith("ACID-"))
+                            {
+                                lastAccountabilityNumber = int.Parse(lastAccountabilityCode.Substring(5));
+                            }
+
+                            if (lastTrackingCode != null && lastTrackingCode.StartsWith("TRID-"))
+                            {
+                                lastTrackingNumber = int.Parse(lastTrackingCode.Substring(5));
+                            }
+                        }
+
+                        // Increment the numbers
+                        int newAccountabilityNumber = lastAccountabilityNumber + 1;
+                        int newTrackingNumber = lastTrackingNumber + 1;
+
+                        // Generate new accountability_code and tracking_code
+                        string newAccountabilityCode = $"ACID-{newAccountabilityNumber:D4}";
+                        string newTrackingCode = $"TRID-{newTrackingNumber:D4}";
+
+                        var newAccountabilityList = new UserAccountabilityList
+                        {
+                            owner_id = ownerId,
+                            accountability_code = newAccountabilityCode,
+                            tracking_code = newTrackingCode,
+                            asset_ids = asset.id.ToString(),
+                            assets = new List<Asset> { asset }
+                        };
+
+                        await _context.user_accountability_lists.AddAsync(newAccountabilityList);
                     }
                     else
                     {
-                        ownerAccountability.asset_ids += "," + asset.id.ToString(); // Add asset ID as comma-separated value
+                        // Ensure asset_ids is not null or empty
+                        newOwnerAccountability.asset_ids = string.IsNullOrWhiteSpace(newOwnerAccountability.asset_ids)
+                            ? asset.id.ToString()
+                            : $"{newOwnerAccountability.asset_ids},{asset.id}";
+
+                        newOwnerAccountability.assets ??= new List<Asset>();
+                        newOwnerAccountability.assets.Add(asset);
+
+                        _context.user_accountability_lists.Update(newOwnerAccountability);
                     }
-
-                    // Ensure assets collection is initialized
-                    if (ownerAccountability.assets == null)
-                    {
-                        ownerAccountability.assets = new List<Asset>();
-                    }
-
-                    // Add asset to the existing user's accountability list
-                    ownerAccountability.assets.Add(asset);
-
-                    _context.user_accountability_lists.Update(ownerAccountability);
                 }
+
+                // Update asset details
+                asset.li_description = string.Join(" ",
+                    assetDto.brand?.Trim(),
+                    assetDto.type?.Trim(),
+                    assetDto.model?.Trim(),
+                    assetDto.ram?.Trim(),
+                    assetDto.ssd?.Trim(),
+                    assetDto.hdd?.Trim(),
+                    assetDto.gpu?.Trim(),
+                    assetDto.size?.Trim(),
+                    assetDto.color?.Trim()).Trim();
+
+                asset.type = assetDto.type;
+                asset.date_acquired = assetDto.date_acquired;
+                asset.asset_barcode = assetDto.asset_barcode;
+                asset.brand = assetDto.brand;
+                asset.model = assetDto.model;
+                asset.ram = assetDto.ram;
+                asset.ssd = assetDto.ssd;
+                asset.hdd = assetDto.hdd;
+                asset.gpu = assetDto.gpu;
+                asset.size = assetDto.size;
+                asset.color = assetDto.color;
+                asset.serial_no = assetDto.serial_no;
+                asset.po = assetDto.po;
+                asset.warranty = assetDto.warranty;
+                asset.cost = assetDto.cost;
+                asset.remarks = assetDto.remarks;
+                asset.owner_id = ownerId;
+
+                _context.Assets.Update(asset);
+
+                await _context.SaveChangesAsync();
+
+                return asset;
             }
-
-            // Update asset details
-            asset.li_description = string.Join(" ",
-                assetDto.brand?.Trim(),
-                assetDto.type?.Trim(),
-                assetDto.model?.Trim(),
-                assetDto.ram?.Trim(),
-                assetDto.ssd?.Trim(),
-                assetDto.hdd?.Trim(),
-                assetDto.gpu?.Trim(),
-                assetDto.size?.Trim(),
-                assetDto.color?.Trim()).Trim();
-
-            asset.type = assetDto.type;
-            asset.date_acquired = assetDto.date_acquired;
-            asset.asset_barcode = assetDto.asset_barcode;
-            asset.brand = assetDto.brand;
-            asset.model = assetDto.model;
-            asset.ram = assetDto.ram;
-            asset.ssd = assetDto.ssd;
-            asset.hdd = assetDto.hdd;
-            asset.gpu = assetDto.gpu;
-            asset.size = assetDto.size;
-            asset.color = assetDto.color;
-            asset.serial_no = assetDto.serial_no;
-            asset.po = assetDto.po;
-            asset.warranty = assetDto.warranty;
-            asset.cost = assetDto.cost;
-            asset.remarks = assetDto.remarks;
-            asset.owner_id = ownerId;
-
-            _context.Assets.Update(asset);
-            await _context.SaveChangesAsync();
-
-            return asset; // Return updated asset
+            catch (DbUpdateException dbEx)
+            {
+                throw new Exception($"Database error: {dbEx.InnerException?.Message}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Unexpected error: {ex.Message}");
+            }
         }
+
+
 
 
     }
