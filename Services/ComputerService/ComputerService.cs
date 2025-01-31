@@ -14,10 +14,10 @@ namespace IT_ASSET.Services.ComputerService
         }
 
         public async Task<PaginatedResponse<Computer>> GetAllComputersAsync(
-            int pageNumber = 1,
-            int pageSize = 10,
-            string sortOrder = "asc",
-            string? searchTerm = null)
+    int pageNumber = 1,
+    int pageSize = 10,
+    string sortOrder = "asc",
+    string? searchTerm = null)
         {
             var query = _context.computers.AsQueryable();
 
@@ -25,9 +25,10 @@ namespace IT_ASSET.Services.ComputerService
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 query = query.Where(computer =>
-                    computer.serial_no.Contains(searchTerm) ||
-                    computer.model.Contains(searchTerm) ||
-                    computer.brand.Contains(searchTerm));
+                    EF.Functions.Like(computer.serial_no, $"%{searchTerm}%") ||
+                    EF.Functions.Like(computer.model, $"%{searchTerm}%") ||
+                    EF.Functions.Like(computer.brand, $"%{searchTerm}%") ||
+                    EF.Functions.Like(computer.type, $"%{searchTerm}%")); 
             }
 
             // Apply sorting based on the order
@@ -55,6 +56,7 @@ namespace IT_ASSET.Services.ComputerService
                 PageSize = pageSize
             };
         }
+
 
 
         public async Task<Computer> UpdateComputerAsync(int computerId, UpdateComputerDto computerDto, int ownerId)

@@ -809,10 +809,10 @@ namespace IT_ASSET.Services.NewFolder
 
         //for get all items endpoint 
         public async Task<PaginatedResponse<Asset>> GetAllAssetsAsync(
-            int pageNumber = 1,
-            int pageSize = 10,
-            string sortOrder = "asc",
-            string? searchTerm = null)
+    int pageNumber = 1,
+    int pageSize = 10,
+    string sortOrder = "asc",
+    string? searchTerm = null)
         {
             var query = _context.Assets.AsQueryable();
 
@@ -820,9 +820,9 @@ namespace IT_ASSET.Services.NewFolder
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 query = query.Where(asset =>
-                    asset.asset_barcode.Contains(searchTerm) ||
-                    asset.type.Contains(searchTerm) ||
-                    asset.brand.Contains(searchTerm));
+                    EF.Functions.Like(asset.asset_barcode, $"%{searchTerm}%") ||
+                    EF.Functions.Like(asset.type, $"%{searchTerm}%") ||  // Added "type" column
+                    EF.Functions.Like(asset.brand, $"%{searchTerm}%"));
             }
 
             // Apply sorting based on the order
@@ -850,6 +850,7 @@ namespace IT_ASSET.Services.NewFolder
                 PageSize = pageSize
             };
         }
+
 
         //for get by id assets endpoint
         public async Task<Asset?> GetAssetByIdAsync(int id)
