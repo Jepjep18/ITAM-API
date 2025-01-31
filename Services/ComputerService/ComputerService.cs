@@ -269,12 +269,47 @@ namespace IT_ASSET.Services.ComputerService
 
 
         //for get computers by id endpoints
-        public async Task<Computer?> GetComputerByIdAsync(int id)
+        public async Task<object> GetComputerByIdAsync(int id)
         {
             try
             {
                 var computer = await _context.computers
-                    .FirstOrDefaultAsync(c => c.id == id);
+                    .Where(c => c.id == id)
+                    .Select(c => new
+                    {
+                        c.id,
+                        c.type,
+                        c.asset_barcode,
+                        c.brand,
+                        c.model,
+                        c.ram,
+                        c.ssd,
+                        c.hdd,
+                        c.gpu,
+                        c.size,
+                        c.color,
+                        c.serial_no,
+                        c.po,
+                        c.warranty,
+                        c.cost,
+                        c.remarks,
+                        c.li_description,
+                        c.history,
+                        c.asset_image,
+                        c.owner_id,
+                        c.is_deleted,
+                        c.date_created,
+                        c.date_modified,
+                        owner = c.owner_id != null ? new
+                        {
+                            id = c.owner_id,
+                            name = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.name).FirstOrDefault(),
+                            company = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.company).FirstOrDefault(),
+                            department = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.department).FirstOrDefault(),
+                            employee_id = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.employee_id).FirstOrDefault()
+                        } : null
+                    })
+                    .FirstOrDefaultAsync();
 
                 return computer;
             }
@@ -283,6 +318,7 @@ namespace IT_ASSET.Services.ComputerService
                 throw new Exception($"Error retrieving computer with ID {id}: {ex.Message}");
             }
         }
+
 
 
 

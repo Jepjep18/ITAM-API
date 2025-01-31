@@ -882,21 +882,57 @@ namespace IT_ASSET.Services.NewFolder
 
 
         //for get by id assets endpoint
-        public async Task<Asset?> GetAssetByIdAsync(int id)
+        public async Task<object> GetAssetByIdAsync(int id)
         {
             try
             {
                 var asset = await _context.Assets
-                    .FirstOrDefaultAsync(a => a.id == id); 
+                    .Where(a => a.id == id)
+                    .Select(a => new
+                    {
+                        a.id,
+                        a.type,
+                        a.date_acquired,
+                        a.asset_barcode,
+                        a.brand,
+                        a.model,
+                        a.ram,
+                        a.ssd,
+                        a.hdd,
+                        a.gpu,
+                        a.size,
+                        a.color,
+                        a.serial_no,
+                        a.po,
+                        a.warranty,
+                        a.cost,
+                        a.remarks,
+                        a.li_description,
+                        a.history,
+                        a.asset_image,
+                        a.owner_id,
+                        a.is_deleted,
+                        a.date_created,
+                        a.date_modified,
+                        owner = a.owner_id != null ? new
+                        {
+                            id = a.owner_id,
+                            name = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.name).FirstOrDefault(),
+                            company = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.company).FirstOrDefault(),
+                            department = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.department).FirstOrDefault(),
+                            employee_id = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.employee_id).FirstOrDefault()
+                        } : null
+                    })
+                    .FirstOrDefaultAsync();
 
                 return asset;
             }
             catch (Exception ex)
             {
-                // Log the exception (optional)
                 throw new Exception($"Error retrieving asset with ID {id}: {ex.Message}");
             }
         }
+
 
         public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId, ClaimsPrincipal user)
         {
