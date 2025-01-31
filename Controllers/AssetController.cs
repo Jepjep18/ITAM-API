@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 [Route("api/[controller]")]
@@ -42,9 +43,8 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Simulate importing assets
             var result = await _assetImportService.ImportAssetsAsync(file);
-            return Ok(new { message = result }); // JSON response
+            return Ok(new { message = result });
         }
         catch (Exception ex)
         {
@@ -64,10 +64,9 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Call the service to handle adding the asset
             var result = await _assetService.AddAssetAsync(assetDto);
 
-            return Ok(result); // Return the success message
+            return Ok(result); 
         }
         catch (Exception ex)
         {
@@ -87,7 +86,6 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Call the service to handle the image upload
             var filePath = await _assetService.UploadAssetImageAsync(assetId, assetImage);
 
             return Ok(new { message = "Image uploaded successfully.", filePath });
@@ -110,7 +108,6 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Call the service to handle the image upload
             var filePath = await _assetService.UploadComputerImageAsync(computerId, computerImage);
 
             return Ok(new { message = "Computer image uploaded successfully.", filePath });
@@ -127,7 +124,6 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Call the service to assign the owner and update accountability list
             var asset = await _assetService.AssignOwnerToAssetAsync(assignOwnerDto);
 
             return Ok(new { message = "Owner assigned successfully to the asset.", asset });
@@ -150,7 +146,6 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Call the service to assign the owner
             var result = await _assetService.AssignOwnerToComputerAsync(assignOwnerforComputerDto);
 
             return Ok(new { message = "Owner assigned successfully to the computer.", result });
@@ -173,7 +168,6 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Call the service to create the vacant asset
             var asset = await _assetService.CreateVacantAssetAsync(assetDto);
 
             return Ok(new { message = "Asset created successfully.", asset });
@@ -187,23 +181,20 @@ public class AssetsController : ControllerBase
 
 
 
-
+    //get endpoint to fetch assets and computer items based on owner id
     [HttpGet("owner/{owner_id}")]
     public async Task<IActionResult> GetAssetsByOwnerId(int owner_id)
     {
         try
         {
-            // Query for Assets
             var assets = await _context.Assets
                 .Where(a => a.owner_id == owner_id)
                 .ToListAsync();
 
-            // Query for Computers
             var computers = await _context.computers
                 .Where(c => c.owner_id == owner_id)
                 .ToListAsync();
 
-            // Combine the results into a single list
             var combinedResults = new List<object>();
             combinedResults.AddRange(assets);
             combinedResults.AddRange(computers);
@@ -222,7 +213,7 @@ public class AssetsController : ControllerBase
     }
 
 
-    [HttpGet("type/{type}")]
+    [HttpGet("type-filter-asset-computers/{type}")]
     public async Task<IActionResult> GetAssetsByType(
     string type,
     int pageNumber = 1,
@@ -232,7 +223,6 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Delegate the logic to the AssetService
             var response = await _assetService.GetAssetsByTypeAsync(
                 type, pageNumber, pageSize, sortOrder, searchTerm);
 
@@ -259,7 +249,6 @@ public class AssetsController : ControllerBase
         {
             try
             {
-                // Delegate the logic to the AssetService
                 var response = await _assetService.GetAllAssetsAsync(pageNumber, pageSize, sortOrder, searchTerm);
 
                 if (response == null || !response.Items.Any())
@@ -284,7 +273,6 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Delegate the logic to the ComputerService
             var response = await _computerService.GetAllComputersAsync(pageNumber, pageSize, sortOrder, searchTerm);
 
             if (response == null || !response.Items.Any())
@@ -303,11 +291,11 @@ public class AssetsController : ControllerBase
 
 
     [HttpGet("assets/vacant")]
-        public async Task<IActionResult> GetVacantAssets()
-        {
-            var vacantAssets = await _context.Assets
-                .Where(a => a.owner_id == null)
-                .ToListAsync();
+    public async Task<IActionResult> GetVacantAssets()
+    {
+    var vacantAssets = await _context.Assets
+        .Where(a => a.owner_id == null)
+        .ToListAsync();
 
             if (vacantAssets == null || vacantAssets.Count == 0)
             {
@@ -315,7 +303,7 @@ public class AssetsController : ControllerBase
             }
 
             return Ok(vacantAssets);
-        }
+    }
 
     [HttpGet("computers/vacant")]
     public async Task<IActionResult> GetVacantComputers()
@@ -337,7 +325,6 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Delegate the logic to the AssetService to get asset by ID
             var asset = await _assetService.GetAssetByIdAsync(id);
 
             if (asset == null)
@@ -358,7 +345,6 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Delegate the logic to the ComputerService to get the computer by ID
             var computer = await _computerService.GetComputerByIdAsync(id);
 
             if (computer == null)
@@ -381,13 +367,11 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Call the service to get the asset image file path
             var filePath = _assetService.GetAssetImageByFilenameAsync(filename).Result;
 
             Console.WriteLine($"Requested filename: '{filename}'");
             Console.WriteLine($"Looking for file at: {filePath}");
 
-            // Determine content type based on file extension
             var fileExtension = Path.GetExtension(filename).ToLowerInvariant();
             string contentType = fileExtension switch
             {
@@ -399,7 +383,6 @@ public class AssetsController : ControllerBase
                 _ => "application/octet-stream"
             };
 
-            // Open the file as a stream and return it
             var image = System.IO.File.OpenRead(filePath);
             return File(image, contentType);
         }
@@ -426,13 +409,11 @@ public class AssetsController : ControllerBase
     {
         try
         {
-            // Call the service to get the computer image file path
             var filePath = _computerService.GetComputerImageByFilenameAsync(filename).Result;
 
             Console.WriteLine($"Requested filename: '{filename}'");
             Console.WriteLine($"Looking for file at: {filePath}");
 
-            // Determine content type based on file extension
             var fileExtension = Path.GetExtension(filename).ToLowerInvariant();
             string contentType = fileExtension switch
             {
@@ -444,7 +425,6 @@ public class AssetsController : ControllerBase
                 _ => "application/octet-stream"
             };
 
-            // Open the file as a stream and return it
             var image = System.IO.File.OpenRead(filePath);
             return File(image, contentType);
         }
@@ -477,11 +457,12 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Step 1: Delegate user handling logic to UserService
             var ownerId = await _userService.GetOrCreateUserAsync(assetDto);
 
-            // Step 2: Delegate asset update logic to AssetService
-            var updatedAsset = await _assetService.UpdateAssetAsync(asset_id, assetDto, ownerId);
+            // Access the ClaimsPrincipal from HttpContext.User
+            var user = HttpContext.User;
+
+            var updatedAsset = await _assetService.UpdateAssetAsync(asset_id, assetDto, ownerId, user);
 
             if (updatedAsset == null)
             {
@@ -507,11 +488,9 @@ public class AssetsController : ControllerBase
 
         try
         {
-            // Step 1: Delegate user handling logic to UserService
             var ownerId = await _userService.GetOrCreateUserAsync(computerDto);
 
-            // Step 2: Delegate computer update logic to ComputerService
-            var updatedComputer = await _computerService.UpdateComputerAsync(computer_id, computerDto, ownerId);
+            var updatedComputer = await _computerService.UpdateComputerAsync(computer_id, computerDto, ownerId, HttpContext.User);
 
             if (updatedComputer == null)
             {
@@ -528,28 +507,41 @@ public class AssetsController : ControllerBase
 
 
 
+
     [HttpDelete("delete-asset/{id}")]
     public async Task<IActionResult> DeleteAsset(int id)
     {
-        var asset = await _context.Assets.FirstOrDefaultAsync(a => a.id == id);
+        var user = HttpContext.User; // Get the logged-in user details
 
-        if (asset == null)
+        var result = await _assetService.DeleteAssetAsync(id, user);
+
+        if (!result.Success)
         {
-            return NotFound(new { message = "Asset not found." });
+            return StatusCode(result.StatusCode, new { message = result.Message });
         }
-
-        if (asset.is_deleted)
-        {
-            return Conflict(new { message = "Asset is already deleted." });
-        }
-
-        asset.is_deleted = true;
-        asset.date_modified = DateTime.UtcNow; 
-
-        _context.Assets.Update(asset);
-        await _context.SaveChangesAsync();
 
         return Ok(new { message = "Asset deleted successfully.", assetId = id });
     }
+
+
+
+
+    [HttpDelete("delete-computer/{id}")]
+    public async Task<IActionResult> DeleteComputer(int id)
+    {
+        var user = HttpContext.User; // Get the logged-in user details
+
+        var result = await _computerService.DeleteComputerAsync(id, user);
+
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, new { message = result.Message });
+        }
+
+        return Ok(new { message = "Computer deleted successfully.", computerId = id });
+    }
+
+
+
 
 }

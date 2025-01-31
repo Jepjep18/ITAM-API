@@ -74,35 +74,40 @@ namespace IT_ASSET.Services.NewFolder
 
                     if (computerTypes.Contains(assetType))
                     {
-                        // Store in Computer table
-                        var computer = new Computer
-                        {
-                            type = assetType,
-                            date_acquired = dateAcquired,
-                            asset_barcode = GetCellValue(worksheet.Cells[row, 6]),
-                            brand = GetCellValue(worksheet.Cells[row, 7]),
-                            model = GetCellValue(worksheet.Cells[row, 8]),
-                            ram = GetCellValue(worksheet.Cells[row, 9]),
-                            ssd = GetCellValue(worksheet.Cells[row, 10]),
-                            hdd = GetCellValue(worksheet.Cells[row, 11]),
-                            gpu = GetCellValue(worksheet.Cells[row, 12]),
-                            size = GetCellValue(worksheet.Cells[row, 13]),
-                            color = GetCellValue(worksheet.Cells[row, 14]),
-                            serial_no = GetCellValue(worksheet.Cells[row, 15]),
-                            po = GetCellValue(worksheet.Cells[row, 16]),
-                            warranty = GetCellValue(worksheet.Cells[row, 17]),
-                            cost = TryParseDecimal(worksheet.Cells[row, 18]) ?? 0,
-                            remarks = GetCellValue(worksheet.Cells[row, 26]),
-                            owner_id = user.id,
-                            date_created = DateTime.UtcNow,
-                            li_description = liDescription,
-                            history = history // Assigning the history list to the computer
-                        };
-
+                        Computer computer = null;  // Declare computer outside try block
                         try
                         {
+                            // Create Computer object
+                            computer = new Computer
+                            {
+                                type = assetType,
+                                date_acquired = dateAcquired,
+                                asset_barcode = GetCellValue(worksheet.Cells[row, 6]),
+                                brand = GetCellValue(worksheet.Cells[row, 7]),
+                                model = GetCellValue(worksheet.Cells[row, 8]),
+                                ram = GetCellValue(worksheet.Cells[row, 9]),
+                                ssd = GetCellValue(worksheet.Cells[row, 10]),
+                                hdd = GetCellValue(worksheet.Cells[row, 11]),
+                                gpu = GetCellValue(worksheet.Cells[row, 12]),
+                                size = GetCellValue(worksheet.Cells[row, 13]),
+                                color = GetCellValue(worksheet.Cells[row, 14]),
+                                serial_no = GetCellValue(worksheet.Cells[row, 15]),
+                                po = GetCellValue(worksheet.Cells[row, 16]),
+                                warranty = GetCellValue(worksheet.Cells[row, 17]),
+                                cost = TryParseDecimal(worksheet.Cells[row, 18]) ?? 0,
+                                remarks = GetCellValue(worksheet.Cells[row, 26]),
+                                owner_id = user.id,
+                                date_created = DateTime.UtcNow,
+                                li_description = liDescription,
+                                history = history
+                            };
+
                             _context.computers.Add(computer);
                             await _context.SaveChangesAsync();
+
+                            // Log the computer creation
+                            await LogComputerActionAsync(computer, "Computer Imported", user.id,
+                                $"Computer of type {computer.type} with barcode {computer.asset_barcode} imported.");
 
                             // After storing the computer, store the components in computer_components table
                             await StoreInComputerComponentsAsync(worksheet, row, assetType, user, computer);
@@ -118,38 +123,41 @@ namespace IT_ASSET.Services.NewFolder
                         catch (DbUpdateException dbEx)
                         {
                             var innerException = dbEx.InnerException?.Message ?? dbEx.Message;
-                            throw new Exception($"Error saving computer: {innerException}");
+                            var errorDetails = computer != null
+                                ? $"Error saving computer of type {computer.type} with barcode {computer.asset_barcode}: {innerException}"
+                                : $"Error saving computer: {innerException}";
+                            throw new Exception(errorDetails);
                         }
                     }
                     else
                     {
-                        // Store in Asset table
-                        var asset = new Asset
-                        {
-                            type = assetType,
-                            date_acquired = dateAcquired,
-                            asset_barcode = GetCellValue(worksheet.Cells[row, 6]),
-                            brand = GetCellValue(worksheet.Cells[row, 7]),
-                            model = GetCellValue(worksheet.Cells[row, 8]),
-                            ram = GetCellValue(worksheet.Cells[row, 9]),
-                            ssd = GetCellValue(worksheet.Cells[row, 10]),
-                            hdd = GetCellValue(worksheet.Cells[row, 11]),
-                            gpu = GetCellValue(worksheet.Cells[row, 12]),
-                            size = GetCellValue(worksheet.Cells[row, 13]),
-                            color = GetCellValue(worksheet.Cells[row, 14]),
-                            serial_no = GetCellValue(worksheet.Cells[row, 15]),
-                            po = GetCellValue(worksheet.Cells[row, 16]),
-                            warranty = GetCellValue(worksheet.Cells[row, 17]),
-                            cost = TryParseDecimal(worksheet.Cells[row, 18]) ?? 0,
-                            remarks = GetCellValue(worksheet.Cells[row, 26]),
-                            owner_id = user.id,
-                            date_created = DateTime.UtcNow,
-                            li_description = liDescription,
-                            history = history // Assigning the history list to the asset
-                        };
-
                         try
                         {
+                            // Store in Asset table
+                            var asset = new Asset
+                            {
+                                type = assetType,
+                                date_acquired = dateAcquired,
+                                asset_barcode = GetCellValue(worksheet.Cells[row, 6]),
+                                brand = GetCellValue(worksheet.Cells[row, 7]),
+                                model = GetCellValue(worksheet.Cells[row, 8]),
+                                ram = GetCellValue(worksheet.Cells[row, 9]),
+                                ssd = GetCellValue(worksheet.Cells[row, 10]),
+                                hdd = GetCellValue(worksheet.Cells[row, 11]),
+                                gpu = GetCellValue(worksheet.Cells[row, 12]),
+                                size = GetCellValue(worksheet.Cells[row, 13]),
+                                color = GetCellValue(worksheet.Cells[row, 14]),
+                                serial_no = GetCellValue(worksheet.Cells[row, 15]),
+                                po = GetCellValue(worksheet.Cells[row, 16]),
+                                warranty = GetCellValue(worksheet.Cells[row, 17]),
+                                cost = TryParseDecimal(worksheet.Cells[row, 18]) ?? 0,
+                                remarks = GetCellValue(worksheet.Cells[row, 26]),
+                                owner_id = user.id,
+                                date_created = DateTime.UtcNow,
+                                li_description = liDescription,
+                                history = history
+                            };
+
                             _context.Assets.Add(asset);
                             await _context.SaveChangesAsync();
 
@@ -303,6 +311,21 @@ namespace IT_ASSET.Services.NewFolder
             };
 
             _context.asset_Logs.Add(log);
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task LogComputerActionAsync(Computer computer, string action, int performedByUserId, string details)
+        {
+            var log = new Computer_logs
+            {
+                computer_id = computer.id,
+                action = action,
+                performed_by_user_id = performedByUserId.ToString(),
+                timestamp = DateTime.UtcNow,
+                details = details
+            };
+
+            _context.computer_Logs.Add(log);
             await _context.SaveChangesAsync();
         }
 

@@ -1,6 +1,9 @@
 ﻿using IT_ASSET.DTOs;
 using IT_ASSET.Models;
+using IT_ASSET.Models.Logs;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using System.Security.Claims;
 
 namespace IT_ASSET.Services.ComputerService
 {
@@ -13,15 +16,15 @@ namespace IT_ASSET.Services.ComputerService
             _context = context;
         }
 
+        //for get all computer items endpoint
         public async Task<PaginatedResponse<Computer>> GetAllComputersAsync(
-    int pageNumber = 1,
-    int pageSize = 10,
-    string sortOrder = "asc",
-    string? searchTerm = null)
+        int pageNumber = 1,
+        int pageSize = 10,
+        string sortOrder = "asc",
+        string? searchTerm = null)
         {
             var query = _context.computers.AsQueryable();
 
-            // Apply search filter if provided
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 query = query.Where(computer =>
@@ -31,23 +34,19 @@ namespace IT_ASSET.Services.ComputerService
                     EF.Functions.Like(computer.type, $"%{searchTerm}%")); 
             }
 
-            // Apply sorting based on the order
             query = sortOrder.ToLower() switch
             {
                 "desc" => query.OrderByDescending(computer => computer.id),
                 "asc" or _ => query.OrderBy(computer => computer.id),
             };
 
-            // Get the total count of the filtered and sorted computers
             var totalItems = await query.CountAsync();
 
-            // Apply pagination (skip and take)
             var paginatedData = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            // Return the paginated response
             return new PaginatedResponse<Computer>
             {
                 Items = paginatedData,
@@ -58,8 +57,8 @@ namespace IT_ASSET.Services.ComputerService
         }
 
 
-
-        public async Task<Computer> UpdateComputerAsync(int computerId, UpdateComputerDto computerDto, int ownerId)
+        //for update computer data endpoint
+        public async Task<Computer> UpdateComputerAsync(int computerId, UpdateComputerDto computerDto, int ownerId, ClaimsPrincipal user)
         {
             try
             {
@@ -67,10 +66,16 @@ namespace IT_ASSET.Services.ComputerService
 
                 if (computer == null)
                 {
-                    return null; // Computer not found
+                    return null;
                 }
 
-                // Maintain history if the owner is changing
+                var settings = new JsonSerializerSettings
+                {
+                    ReferenceLoopHandling = ReferenceLoopHandling.Ignore 
+                };
+
+                string originalData = JsonConvert.SerializeObject(computer, settings); 
+
                 if (computer.owner_id != ownerId)
                 {
                     if (computer.history == null)
@@ -78,8 +83,7 @@ namespace IT_ASSET.Services.ComputerService
                         computer.history = new List<string>();
                     }
 
-                    // Only add to history if there was a previous owner
-                    if (computer.owner_id.HasValue) // Check if owner_id is not null
+                    if (computer.owner_id.HasValue) 
                     {
                         var previousOwnerName = await _context.Users
                             .Where(u => u.id == computer.owner_id)
@@ -89,7 +93,6 @@ namespace IT_ASSET.Services.ComputerService
                         string previousOwner = previousOwnerName ?? "Unknown";
                         computer.history.Add(previousOwner);
 
-                        // Remove the computer from the previous owner's accountability list
                         var previousOwnerAccountability = await _context.user_accountability_lists
                             .FirstOrDefaultAsync(al => al.owner_id == computer.owner_id);
 
@@ -170,7 +173,6 @@ namespace IT_ASSET.Services.ComputerService
                     }
                 }
 
-                // Update the computer properties
                 computer.type = computerDto.type;
                 computer.date_acquired = computerDto.date_acquired;
                 computer.asset_barcode = computerDto.asset_barcode;
@@ -187,12 +189,27 @@ namespace IT_ASSET.Services.ComputerService
                 computer.warranty = computerDto.warranty;
                 computer.cost = computerDto.cost;
                 computer.remarks = computerDto.remarks;
-                computer.owner_id = ownerId; // Update owner_id
+                computer.owner_id = ownerId;
 
                 _context.computers.Update(computer);
 
-                // Update the ComputerComponents table for the relevant components
                 await UpdateComputerComponentsAsync(computer, ownerId);
+
+                string updatedData = JsonConvert.SerializeObject(computer, settings); 
+
+                var performedByUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "SYSTEM_USER";
+
+                var computerLog = new Computer_logs
+                {
+                    computer_id = computer.id,
+                    action = "UPDATE",
+                    performed_by_user_id = performedByUserId,
+                    timestamp = DateTime.UtcNow,
+                    details = $"Computer ID {computer.id} was updated by User ID {performedByUserId}. " +
+                              $"Original Data: {originalData}, Updated Data: {updatedData}"
+                };
+
+                _context.computer_Logs.Add(computerLog);
 
                 await _context.SaveChangesAsync();
 
@@ -208,6 +225,7 @@ namespace IT_ASSET.Services.ComputerService
             }
         }
 
+
         private async Task UpdateComputerComponentsAsync(Computer computer, int ownerId)
         {
             var components = await _context.computer_components
@@ -216,19 +234,16 @@ namespace IT_ASSET.Services.ComputerService
 
             foreach (var component in components)
             {
-                // If the component's owner_id is different, update it
                 if (component.owner_id != ownerId)
                 {
                     component.owner_id = ownerId;
                 }
 
-                // Update the component's status if owner_id is not null (i.e., assigned)
                 if (component.owner_id != null)
                 {
-                    component.status = "Released"; // Update the status to 'Released' when an owner is assigned
+                    component.status = "Released"; 
                 }
 
-                // Update component details if necessary (e.g., RAM, SSD, HDD, GPU)
                 if (component.type == "RAM" && computer.ram != component.description)
                 {
                     component.description = computer.ram;
@@ -246,28 +261,30 @@ namespace IT_ASSET.Services.ComputerService
                     component.description = computer.gpu;
                 }
 
-                // Update the component in the database
                 _context.computer_components.Update(component);
             }
         }
+
+
+
 
         //for get computers by id endpoints
         public async Task<Computer?> GetComputerByIdAsync(int id)
         {
             try
             {
-                // Query the database to find the computer by ID
                 var computer = await _context.computers
-                    .FirstOrDefaultAsync(c => c.id == id); // Assuming 'Computers' is your DbSet
+                    .FirstOrDefaultAsync(c => c.id == id);
 
                 return computer;
             }
             catch (Exception ex)
             {
-                // Log the exception (optional)
                 throw new Exception($"Error retrieving computer with ID {id}: {ex.Message}");
             }
         }
+
+
 
 
         //for get computer filename endpoint
@@ -275,14 +292,11 @@ namespace IT_ASSET.Services.ComputerService
         {
             try
             {
-                // Define the base directory for computer images
                 string baseDirectory = @"C:\ITAM\assets\computer-images";
 
-                // Get all subdirectories in the base directory
                 var directories = Directory.GetDirectories(baseDirectory);
                 string filePath = null;
 
-                // First try the root directory
                 var rootPath = Path.Combine(baseDirectory, filename);
                 if (File.Exists(rootPath))
                 {
@@ -290,7 +304,6 @@ namespace IT_ASSET.Services.ComputerService
                 }
                 else
                 {
-                    // If not in root, search through all subdirectories
                     foreach (var directory in directories)
                     {
                         var potentialPath = Path.Combine(directory, filename);
@@ -302,7 +315,6 @@ namespace IT_ASSET.Services.ComputerService
                     }
                 }
 
-                // If file is not found anywhere
                 if (filePath == null)
                 {
                     Console.WriteLine($"File not found. Searched in base directory and all subdirectories of: {baseDirectory}");
@@ -316,11 +328,69 @@ namespace IT_ASSET.Services.ComputerService
             }
             catch (Exception ex)
             {
-                // Add more context to the error
                 Console.WriteLine($"Error details: {ex}");
                 throw new Exception($"Error fetching computer image: {ex.Message}", ex);
             }
         }
+
+
+        //for delete endpoint 
+        public async Task<ServiceResponse> DeleteComputerAsync(int id, ClaimsPrincipal user)
+        {
+            var computer = await _context.computers.FirstOrDefaultAsync(c => c.id == id);
+
+            if (computer == null)
+            {
+                return new ServiceResponse { Success = false, StatusCode = 404, Message = "Computer not found." };
+            }
+
+            if (computer.is_deleted)
+            {
+                return new ServiceResponse { Success = false, StatusCode = 409, Message = "Computer is already deleted." };
+            }
+
+            var assignedUser = await _context.user_accountability_lists
+                .FirstOrDefaultAsync(ua => ua.computer_ids != null && ua.computer_ids.Contains(id.ToString()));
+
+            if (assignedUser != null)
+            {
+                var updatedComputerIds = assignedUser.computer_ids
+                    .Split(',')
+                    .Where(cid => cid.Trim() != id.ToString()) 
+                    .ToArray();
+
+                assignedUser.computer_ids = updatedComputerIds.Length > 0
+                    ? string.Join(",", updatedComputerIds)
+                    : null; 
+
+                _context.user_accountability_lists.Update(assignedUser);
+            }
+
+            computer.is_deleted = true;
+            computer.date_modified = DateTime.UtcNow;
+
+            _context.computers.Update(computer);
+
+            string performedByUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System"; 
+
+            var computerLog = new Computer_logs
+            {
+                computer_id = computer.id,
+                action = "DELETE",
+                performed_by_user_id = performedByUserId,
+                timestamp = DateTime.UtcNow,
+                details = $"Computer ID {computer.id} was deleted by User ID {performedByUserId}."
+            };
+
+            _context.computer_Logs.Add(computerLog);
+
+            await _context.SaveChangesAsync();
+
+            return new ServiceResponse { Success = true, StatusCode = 200, Message = "Computer deleted successfully." };
+        }
+
+
+
 
 
 

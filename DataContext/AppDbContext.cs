@@ -9,6 +9,8 @@ public class AppDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Asset> Assets { get; set; }
     public DbSet<Asset_logs> asset_Logs { get; set; }
+    public DbSet<Computer_logs> computer_Logs { get; set; }
+
     public DbSet<User_logs> user_logs { get; set; }
     public DbSet<UserAccountabilityList> user_accountability_lists { get; set; }
     public DbSet<ComputerComponents> computer_components { get; set; }
@@ -43,6 +45,12 @@ public class AppDbContext : DbContext
             .HasOne(a => a.user)
             .WithMany()
             .HasForeignKey(a => a.user_id);
+
+        //configure one-to-many relationshio (computer -> computer_logs
+        modelBuilder.Entity<Computer_logs>()
+            .HasOne(cl => cl.computer)
+            .WithMany()
+            .HasForeignKey(cl => cl.computer_id);
 
         // Configure UserAccountabilityList without cascading deletes
         modelBuilder.Entity<UserAccountabilityList>()

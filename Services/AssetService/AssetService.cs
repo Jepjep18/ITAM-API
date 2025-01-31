@@ -1,8 +1,11 @@
 ﻿using IT_ASSET.DTOs;
 using IT_ASSET.Models;
+using IT_ASSET.Models.Logs;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using System;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace IT_ASSET.Services.NewFolder
@@ -20,7 +23,6 @@ namespace IT_ASSET.Services.NewFolder
 
         public async Task<string> AddAssetAsync(AddAssetDto assetDto)
         {
-            
             if (string.IsNullOrWhiteSpace(assetDto.type) || string.IsNullOrWhiteSpace(assetDto.asset_barcode))
             {
                 throw new ArgumentException("Type and Asset Barcode are required.");
@@ -32,9 +34,9 @@ namespace IT_ASSET.Services.NewFolder
             var liDescription = GenerateLiDescription(assetDto);
 
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
-            };
+    {
+        "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
+    };
 
             try
             {
@@ -45,16 +47,16 @@ namespace IT_ASSET.Services.NewFolder
                         type = assetDto.type,
                         asset_barcode = assetDto.asset_barcode,
                         owner_id = user.id,
-                        
                     };
 
                     _context.computers.Add(computer);
                     await _context.SaveChangesAsync();
 
-                    
+                    // Add log for the computer
+                    await LogAssetActionAsync(computer, "Computer Added", user.id, $"Computer with barcode {computer.asset_barcode} added.");
+
                     await HandleUserAccountabilityListAsync(user, computer);
 
-                    
                     await StoreInComputerComponentsAsync(assetDto, user);
 
                     return "Computer added successfully.";
@@ -66,13 +68,14 @@ namespace IT_ASSET.Services.NewFolder
                         type = assetDto.type,
                         asset_barcode = assetDto.asset_barcode,
                         owner_id = user.id,
-                        
                     };
 
                     _context.Assets.Add(asset);
                     await _context.SaveChangesAsync();
 
-                    
+                    // Add log for the asset
+                    await LogAssetActionAsync(asset, "Asset Added", user.id, $"Asset with barcode {asset.asset_barcode} added.");
+
                     await HandleUserAccountabilityListAsync(user, asset);
 
                     return "Asset added successfully.";
@@ -97,6 +100,42 @@ namespace IT_ASSET.Services.NewFolder
                 throw;
             }
         }
+
+
+        private async Task LogAssetActionAsync(object asset, string action, int performedByUserId, string details)
+        {
+            if (asset is Asset)
+            {
+                var assetLog = new Asset_logs
+                {
+                    asset_id = ((Asset)asset).id,
+                    action = action,
+                    performed_by_user_id = performedByUserId.ToString(),
+                    timestamp = DateTime.UtcNow,
+                    details = details
+                };
+
+                _context.asset_Logs.Add(assetLog);
+                await _context.SaveChangesAsync();
+            }
+            else if (asset is Computer)
+            {
+                var computerLog = new Computer_logs
+                {
+                    computer_id = ((Computer)asset).id, // Assuming Computer has an 'id' field
+                    action = action,
+                    performed_by_user_id = performedByUserId.ToString(),
+                    timestamp = DateTime.UtcNow,
+                    details = details
+                };
+
+                _context.computer_Logs.Add(computerLog); // Add to computer_logs table
+                await _context.SaveChangesAsync();
+            }
+        }
+
+
+
 
 
 
@@ -225,7 +264,7 @@ namespace IT_ASSET.Services.NewFolder
                     existingAssetIds.Add(asset.id);
                     userAccountabilityList.asset_ids = string.Join(",", existingAssetIds);
                 }
-                else if (item is Computer computer) // Added this case to handle Computer objects
+                else if (item is Computer computer)
                 {
                     Console.WriteLine($"Adding Computer ID: {computer.id} to User {user.id}");
 
@@ -315,47 +354,38 @@ namespace IT_ASSET.Services.NewFolder
                     throw new ArgumentException("Invalid file type. Only images are allowed.");
                 }
 
-                // Find the asset by ID
                 var asset = await _context.Assets.FindAsync(assetId);
                 if (asset == null)
                 {
                     throw new KeyNotFoundException("Asset not found.");
                 }
 
-                // Generate a unique file name
                 string uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(assetImage.FileName);
 
-                // Define the base directory for asset images
-                string baseDirectory = Path.Combine(@"C:\ITAM\assets\asset-images");  // Base path for asset images
+                string baseDirectory = Path.Combine(@"C:\ITAM\assets\asset-images");  
 
-                // Create a subdirectory based on asset ID
                 string directoryPath = Path.Combine(baseDirectory, assetId.ToString());
 
-                // Ensure the directory exists
                 if (!Directory.Exists(directoryPath))
                 {
                     Directory.CreateDirectory(directoryPath);
                 }
 
-                // Combine directory path and the unique file name to get the full file path
                 string filePath = Path.Combine(directoryPath, uniqueFileName).Replace("\\", "/");
 
-                // Save the file to the file system
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await assetImage.CopyToAsync(stream);
                 }
 
-                // Update the asset image path in the database
                 asset.asset_image = filePath;
                 _context.Assets.Update(asset);
                 await _context.SaveChangesAsync();
 
-                return filePath;  // Return the file path to the caller
+                return filePath;  
             }
             catch (Exception ex)
             {
-                // Handle errors
                 throw new Exception($"Error uploading asset image: {ex.Message}");
             }
         }
@@ -374,47 +404,38 @@ namespace IT_ASSET.Services.NewFolder
                     throw new ArgumentException("Invalid file type. Only images are allowed.");
                 }
 
-                // Find the computer by ID
                 var computer = await _context.computers.FindAsync(computerId);
                 if (computer == null)
                 {
                     throw new KeyNotFoundException("Computer not found.");
                 }
 
-                // Generate a unique file name
                 string uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(computerImage.FileName);
 
-                // Define the base directory for computer images
-                string baseDirectory = Path.Combine(@"C:\ITAM\assets\computer-images");  // Base path for computer images
+                string baseDirectory = Path.Combine(@"C:\ITAM\assets\computer-images");  
 
-                // Create a subdirectory based on computer ID
                 string directoryPath = Path.Combine(baseDirectory, computerId.ToString());
 
-                // Ensure the directory exists
                 if (!Directory.Exists(directoryPath))
                 {
                     Directory.CreateDirectory(directoryPath);
                 }
 
-                // Combine directory path and the unique file name to get the full file path
                 string filePath = Path.Combine(directoryPath, uniqueFileName).Replace("\\", "/");
 
-                // Save the file to the file system
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await computerImage.CopyToAsync(stream);
                 }
 
-                // Update the computer image path in the database
                 computer.asset_image = filePath;
                 _context.computers.Update(computer);
                 await _context.SaveChangesAsync();
 
-                return filePath;  // Return the file path to the caller
+                return filePath;  
             }
             catch (Exception ex)
             {
-                // Handle errors
                 throw new Exception($"Error uploading computer image: {ex.Message}");
             }
         }
@@ -424,7 +445,6 @@ namespace IT_ASSET.Services.NewFolder
         //for create-vacant-asset/computer endpoint 
         public async Task<object> CreateVacantAssetAsync(CreateAssetDto assetDto)
         {
-            // Define types that should go to the computer database
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "CPU",
@@ -482,7 +502,11 @@ namespace IT_ASSET.Services.NewFolder
                 _context.computers.Add(computer);
                 await _context.SaveChangesAsync();
 
-                // Store the computer components in the computer_components table
+                // Log the action for the computer creation
+                string action = "Vacant Computer Created";
+                string details = $"Vacant computer created with barcode {computer.asset_barcode}, brand {computer.brand}, and model {computer.model}.";
+                await LogAssetActionAsync(computer, action, 0, details);  // Assuming '0' means no owner yet
+
                 await StoreComputerComponentsAsync(computer, assetDto);
 
                 return computer;
@@ -518,13 +542,18 @@ namespace IT_ASSET.Services.NewFolder
                 _context.Assets.Add(asset);
                 await _context.SaveChangesAsync();
 
+                // Log the action for the asset creation
+                string action = "Vacant Asset Created";
+                string details = $"Vacant asset created with barcode {asset.asset_barcode}, brand {asset.brand}, and model {asset.model}.";
+                await LogAssetActionAsync(asset, action, 0, details);  // Assuming '0' means no owner yet
+
                 return asset;
             }
         }
 
+
         private async Task StoreComputerComponentsAsync(Computer computer, CreateAssetDto assetDto)
         {
-            // Create a list of components based on the computer's properties
             var components = new List<ComputerComponents>();
 
             // Add RAM as a component if it exists
@@ -536,9 +565,9 @@ namespace IT_ASSET.Services.NewFolder
                     description = computer.ram,
                     asset_barcode = $"{computer.asset_barcode}",
                     status = "Available",
-                    owner_id = null, // Vacant asset, so no owner
+                    owner_id = null,
                     history = new List<string>(),
-                    computer_id = computer.id // Set the computer_id foreign key
+                    computer_id = computer.id
                 });
             }
 
@@ -551,9 +580,9 @@ namespace IT_ASSET.Services.NewFolder
                     description = computer.ssd,
                     asset_barcode = $"{computer.asset_barcode}",
                     status = "Available",
-                    owner_id = null, // Vacant asset, so no owner
+                    owner_id = null,
                     history = new List<string>(),
-                    computer_id = computer.id // Set the computer_id foreign key
+                    computer_id = computer.id
                 });
             }
 
@@ -566,9 +595,9 @@ namespace IT_ASSET.Services.NewFolder
                     description = computer.hdd,
                     asset_barcode = $"{computer.asset_barcode}",
                     status = "Available",
-                    owner_id = null, // Vacant asset, so no owner
+                    owner_id = null, 
                     history = new List<string>(),
-                    computer_id = computer.id // Set the computer_id foreign key
+                    computer_id = computer.id
                 });
             }
 
@@ -581,13 +610,12 @@ namespace IT_ASSET.Services.NewFolder
                     description = computer.gpu,
                     asset_barcode = $"{computer.asset_barcode}",
                     status = "Available",
-                    owner_id = null, // Vacant asset, so no owner
+                    owner_id = null,
                     history = new List<string>(),
-                    computer_id = computer.id // Set the computer_id foreign key
+                    computer_id = computer.id
                 });
             }
 
-            // Add all components to the database
             _context.computer_components.AddRange(components);
             await _context.SaveChangesAsync();
         }
@@ -615,10 +643,18 @@ namespace IT_ASSET.Services.NewFolder
             _context.Assets.Update(asset);
             await _context.SaveChangesAsync();
 
+            // Log the action in the asset_logs table
+            string action = "Owner Assigned to Asset";
+            string details = $"Owner with ID {user.id} assigned to asset with barcode {asset.asset_barcode}.";
+
+            await LogAssetActionAsync(asset, action, user.id, details);
+
+            // Optionally, update the user accountability list (if applicable)
             await UpdateUserAccountabilityListAsync(user, asset);
 
-            return asset; 
+            return asset;
         }
+
 
         private async Task UpdateUserAccountabilityListAsync(User user, Asset asset)
         {
@@ -675,15 +711,22 @@ namespace IT_ASSET.Services.NewFolder
                 throw new KeyNotFoundException("Owner not found.");
             }
 
+            // Assign the owner to the computer
             computer.owner_id = assignOwnerforComputerDto.owner_id;
 
             _context.computers.Update(computer);
             await _context.SaveChangesAsync();
 
+            // Log the action of assigning the owner
+            string action = "Owner Assigned to Computer";
+            string details = $"Owner with ID {user.id} assigned to computer with barcode {computer.asset_barcode}, brand {computer.brand}, model {computer.model}.";
+            await LogAssetActionAsync(computer, action, user.id, details);
+
             await UpdateUserAccountabilityListAsync(user, computer);
 
             return computer;
         }
+
 
         private async Task UpdateUserAccountabilityListAsync(User user, Computer computer)
         {
@@ -723,10 +766,6 @@ namespace IT_ASSET.Services.NewFolder
         }
 
 
-
-
-
-
         //for get by type endpoint 
         public async Task<PaginatedResponse<Asset>> GetAssetsByTypeAsync(
         string type,
@@ -735,17 +774,14 @@ namespace IT_ASSET.Services.NewFolder
         string sortOrder = "asc",
         string? searchTerm = null)
         {
-            // Query for Assets
             var assetQuery = _context.Assets
                 .Where(a => a.type.ToLower() == type.ToLower())
                 .AsQueryable();
 
-            // Query for Computers
             var computerQuery = _context.computers
                 .Where(c => c.type.ToLower() == type.ToLower())
                 .AsQueryable();
 
-            // Apply search filter to both queries if provided
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 assetQuery = assetQuery.Where(asset =>
@@ -761,7 +797,6 @@ namespace IT_ASSET.Services.NewFolder
                     computer.model.Contains(searchTerm));
             }
 
-            // Combine the results of both queries into a single list
             var combinedQuery = assetQuery
                 .Select(asset => new Asset
                 {
@@ -769,7 +804,6 @@ namespace IT_ASSET.Services.NewFolder
                     type = asset.type,
                     asset_barcode = asset.asset_barcode,
                     brand = asset.brand,
-                    // Map other fields as needed
                 })
                 .Union(computerQuery.Select(computer => new Asset
                 {
@@ -777,27 +811,22 @@ namespace IT_ASSET.Services.NewFolder
                     type = computer.type,
                     asset_barcode = computer.asset_barcode,
                     brand = computer.brand,
-                    // Map other fields as needed
                 }))
                 .AsQueryable();
 
-            // Apply sorting based on the order
             combinedQuery = sortOrder.ToLower() switch
             {
                 "desc" => combinedQuery.OrderByDescending(a => a.id),
                 "asc" or _ => combinedQuery.OrderBy(a => a.id),
             };
 
-            // Get the total count of the filtered and sorted assets
             var totalItems = await combinedQuery.CountAsync();
 
-            // Apply pagination (skip and take)
             var paginatedData = await combinedQuery
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            // Return the paginated response
             return new PaginatedResponse<Asset>
             {
                 Items = paginatedData,
@@ -809,10 +838,10 @@ namespace IT_ASSET.Services.NewFolder
 
         //for get all items endpoint 
         public async Task<PaginatedResponse<Asset>> GetAllAssetsAsync(
-    int pageNumber = 1,
-    int pageSize = 10,
-    string sortOrder = "asc",
-    string? searchTerm = null)
+        int pageNumber = 1,
+        int pageSize = 10,
+        string sortOrder = "asc",
+        string? searchTerm = null)
         {
             var query = _context.Assets.AsQueryable();
 
@@ -869,7 +898,7 @@ namespace IT_ASSET.Services.NewFolder
             }
         }
 
-        public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId)
+        public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId, ClaimsPrincipal user)
         {
             try
             {
@@ -879,6 +908,14 @@ namespace IT_ASSET.Services.NewFolder
                 {
                     return null; // Asset not found
                 }
+
+                // Capture the original data for logging
+                var settings = new JsonSerializerSettings
+                {
+                    ReferenceLoopHandling = ReferenceLoopHandling.Ignore // or Serialize
+                };
+
+                string originalData = JsonConvert.SerializeObject(asset, settings);
 
                 // Check if the owner is changing
                 if (asset.owner_id != ownerId)
@@ -1026,6 +1063,25 @@ namespace IT_ASSET.Services.NewFolder
 
                 _context.Assets.Update(asset);
 
+                // Capture the updated data for logging
+                string updatedData = JsonConvert.SerializeObject(asset, settings);
+
+                // Ensure performed_by_user_id is not null
+                var performedByUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "SYSTEM_USER";
+
+                // Log the update action in asset_logs
+                var assetLog = new Asset_logs
+                {
+                    asset_id = asset.id,
+                    action = "UPDATE",
+                    performed_by_user_id = performedByUserId, // Use the default value if NULL
+                    timestamp = DateTime.UtcNow,
+                    details = $"Asset ID {asset.id} was updated by User ID {performedByUserId}. " +
+                              $"Original Data: {originalData}, Updated Data: {updatedData}"
+                };
+
+                _context.asset_Logs.Add(assetLog);
+
                 await _context.SaveChangesAsync();
 
                 return asset;
@@ -1082,6 +1138,67 @@ namespace IT_ASSET.Services.NewFolder
                 Console.WriteLine($"Error details: {ex}");
                 throw new Exception($"Error fetching asset image: {ex.Message}", ex);
             }
+        }
+
+
+        //for delete endpoint 
+        public async Task<ServiceResponse> DeleteAssetAsync(int id, ClaimsPrincipal user)
+        {
+            var asset = await _context.Assets.FirstOrDefaultAsync(a => a.id == id);
+
+            if (asset == null)
+            {
+                return new ServiceResponse { Success = false, StatusCode = 404, Message = "Asset not found." };
+            }
+
+            if (asset.is_deleted)
+            {
+                return new ServiceResponse { Success = false, StatusCode = 409, Message = "Asset is already deleted." };
+            }
+
+            // Check if the asset is assigned in user_accountability_list
+            var assignedUser = await _context.user_accountability_lists
+                .FirstOrDefaultAsync(ua => ua.asset_ids != null && ua.asset_ids.Contains(id.ToString()));
+
+            if (assignedUser != null)
+            {
+                // Remove the specific asset ID from the comma-separated list
+                var updatedAssetIds = assignedUser.asset_ids
+                    .Split(',')
+                    .Where(aid => aid.Trim() != id.ToString()) // Keep only the IDs that are NOT the one being deleted
+                    .ToArray();
+
+                assignedUser.asset_ids = updatedAssetIds.Length > 0
+                    ? string.Join(",", updatedAssetIds)
+                    : null; // If no more assets remain, set it to null
+
+                _context.user_accountability_lists.Update(assignedUser);
+            }
+
+            // Soft delete the asset
+            asset.is_deleted = true;
+            asset.date_modified = DateTime.UtcNow;
+
+            _context.Assets.Update(asset);
+
+            // Extract user ID from the logged-in user (using authentication)
+            string performedByUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System"; // Default to "System" for now
+
+            // Log the delete action in asset_logs
+            var assetLog = new Asset_logs
+            {
+                asset_id = asset.id,
+                action = "DELETE",
+                performed_by_user_id = performedByUserId,
+                timestamp = DateTime.UtcNow,
+                details = $"Asset ID {asset.id} was deleted by User ID {performedByUserId}."
+            };
+
+            _context.asset_Logs.Add(assetLog);
+
+            await _context.SaveChangesAsync();
+
+            return new ServiceResponse { Success = true, StatusCode = 200, Message = "Asset deleted successfully." };
         }
 
 
