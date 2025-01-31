@@ -4,6 +4,7 @@ using IT_ASSET.Models.Logs;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.Security.Claims;
+using static IT_ASSET.DTOs.UpdateComputerDto;
 
 namespace IT_ASSET.Services.ComputerService
 {
@@ -16,8 +17,7 @@ namespace IT_ASSET.Services.ComputerService
             _context = context;
         }
 
-        //for get all computer items endpoint
-        public async Task<PaginatedResponse<Computer>> GetAllComputersAsync(
+        public async Task<PaginatedResponse<ComputerWithOwnerDTO>> GetAllComputersAsync(
         int pageNumber = 1,
         int pageSize = 10,
         string sortOrder = "asc",
@@ -25,29 +25,65 @@ namespace IT_ASSET.Services.ComputerService
         {
             var query = _context.computers.AsQueryable();
 
+            // Apply search filter if provided
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 query = query.Where(computer =>
                     EF.Functions.Like(computer.serial_no, $"%{searchTerm}%") ||
                     EF.Functions.Like(computer.model, $"%{searchTerm}%") ||
                     EF.Functions.Like(computer.brand, $"%{searchTerm}%") ||
-                    EF.Functions.Like(computer.type, $"%{searchTerm}%")); 
+                    EF.Functions.Like(computer.type, $"%{searchTerm}%"));
             }
 
+            // Apply sorting based on the order
             query = sortOrder.ToLower() switch
             {
                 "desc" => query.OrderByDescending(computer => computer.id),
                 "asc" or _ => query.OrderBy(computer => computer.id),
             };
 
+            // Get the total count of the filtered and sorted computers
             var totalItems = await query.CountAsync();
 
+            // Apply pagination (skip and take)
             var paginatedData = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
+                .Select(computer => new ComputerWithOwnerDTO
+                {
+                    id = computer.id,
+                    type = computer.type,
+                    serial_no = computer.serial_no,
+                    model = computer.model,
+                    brand = computer.brand,
+                    ram = computer.ram,
+                    ssd = computer.ssd,
+                    hdd = computer.hdd,
+                    gpu = computer.gpu,
+                    size = computer.size,
+                    color = computer.color,
+                    warranty = computer.warranty,
+                    cost = computer.cost,
+                    remarks = computer.remarks,
+                    li_description = computer.li_description,
+                    asset_image = computer.asset_image,
+                    owner_id = computer.owner_id,
+                    is_deleted = computer.is_deleted,
+                    date_created = computer.date_created,
+                    date_modified = computer.date_modified,
+                    owner = computer.owner_id != null ? new OwnerDTO
+                    {
+                        id = computer.id,
+                        name = _context.Users.Where(u => u.id == computer.owner_id).Select(u => u.name).FirstOrDefault(),
+                        company = _context.Users.Where(u => u.id == computer.owner_id).Select(u => u.company).FirstOrDefault(),
+                        department = _context.Users.Where(u => u.id == computer.owner_id).Select(u => u.department).FirstOrDefault(),
+                        employee_id = _context.Users.Where(u => u.id == computer.owner_id).Select(u => u.employee_id).FirstOrDefault()
+                    } : null
+                })
                 .ToListAsync();
 
-            return new PaginatedResponse<Computer>
+            // Return the paginated response
+            return new PaginatedResponse<ComputerWithOwnerDTO>
             {
                 Items = paginatedData,
                 TotalItems = totalItems,
@@ -55,6 +91,7 @@ namespace IT_ASSET.Services.ComputerService
                 PageSize = pageSize
             };
         }
+
 
 
         //for update computer data endpoint
@@ -368,6 +405,51 @@ namespace IT_ASSET.Services.ComputerService
                 throw new Exception($"Error fetching computer image: {ex.Message}", ex);
             }
         }
+
+
+        //for get by owner id endpoint 
+        public async Task<List<ComputerWithOwnerDTO>> GetComputersByOwnerIdAsync(int ownerId)
+        {
+            return await _context.computers
+                .Where(c => c.owner_id == ownerId)
+                .Select(c => new ComputerWithOwnerDTO
+                {
+                    id = c.id,
+                    type = c.type,
+                    date_acquired = c.date_acquired,
+                    asset_barcode = c.asset_barcode,
+                    brand = c.brand,
+                    model = c.model,
+                    ram = c.ram,
+                    ssd = c.ssd,
+                    hdd = c.hdd,
+                    gpu = c.gpu,
+                    size = c.size,
+                    color = c.color,
+                    serial_no = c.serial_no,
+                    po = c.po,
+                    warranty = c.warranty,
+                    cost = c.cost,
+                    remarks = c.remarks,
+                    li_description = c.li_description,
+                    history = c.history,
+                    asset_image = c.asset_image,
+                    owner_id = c.owner_id,
+                    is_deleted = c.is_deleted,
+                    date_created = c.date_created,
+                    date_modified = c.date_modified,
+                    owner = c.owner_id != null ? new OwnerDTO
+                    {
+                        id = c.id,
+                        name = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.name).FirstOrDefault(),
+                        company = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.company).FirstOrDefault(),
+                        department = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.department).FirstOrDefault(),
+                        employee_id = _context.Users.Where(u => u.id == c.owner_id).Select(u => u.employee_id).FirstOrDefault()
+                    } : null
+                })
+                .ToListAsync();
+        }
+
 
 
         //for delete endpoint 

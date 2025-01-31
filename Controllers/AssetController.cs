@@ -183,21 +183,17 @@ public class AssetsController : ControllerBase
 
     //get endpoint to fetch assets and computer items based on owner id
     [HttpGet("owner/{owner_id}")]
-    public async Task<IActionResult> GetAssetsByOwnerId(int owner_id)
+    public async Task<IActionResult> GetComputersByOwnerId(int owner_id)
     {
         try
         {
-            var assets = await _context.Assets
-                .Where(a => a.owner_id == owner_id)
-                .ToListAsync();
-
-            var computers = await _context.computers
-                .Where(c => c.owner_id == owner_id)
-                .ToListAsync();
+            // Get assets and computers using the services
+            var assets = await _assetService.GetAssetsByOwnerIdAsync(owner_id);
+            var computers = await _computerService.GetComputersByOwnerIdAsync(owner_id);
 
             var combinedResults = new List<object>();
-            combinedResults.AddRange(assets);
-            combinedResults.AddRange(computers);
+            combinedResults.AddRange(assets); 
+            combinedResults.AddRange(computers); 
 
             if (combinedResults.Count == 0)
             {
@@ -211,6 +207,7 @@ public class AssetsController : ControllerBase
             return BadRequest($"Error retrieving assets and computers: {ex.Message}");
         }
     }
+
 
 
     [HttpGet("type-filter-asset-computers/{type}")]

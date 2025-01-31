@@ -240,13 +240,12 @@ namespace IT_ASSET.Services.NewFolder
 
             // Define headers that you want to store as 'type'
             var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
-            var values = new string[]
-            {
+            var values = new string[] {
             worksheet.Cells[row, 9].Text.Trim(),  // 'RAM'
             worksheet.Cells[row, 10].Text.Trim(), // 'SSD'
             worksheet.Cells[row, 11].Text.Trim(), // 'HDD'
-            worksheet.Cells[row, 12].Text.Trim(), // 'GPU'
-            };
+            worksheet.Cells[row, 12].Text.Trim()  // 'GPU'
+    };
 
             // Extract history data from columns 19 to 25
             var history = new List<string>
@@ -262,6 +261,17 @@ namespace IT_ASSET.Services.NewFolder
 
             // Remove empty or null entries from history
             history.RemoveAll(item => string.IsNullOrWhiteSpace(item));
+
+            // Fetch the last used UID from the computer_components table
+            var lastUid = await _context.computer_components
+                .OrderByDescending(c => c.id) // Order by ID
+                .FirstOrDefaultAsync(); // Get the most recent component
+            int lastUidIndex = lastUid != null ? int.Parse(lastUid.uid.Split('-')[1]) : 0;
+
+            string GenerateUID(int uidIndex)
+            {
+                return $"UID-{uidIndex:D3}";
+            }
 
             // Loop through the headers and values to create components
             for (int i = 0; i < headers.Length; i++)
@@ -279,11 +289,14 @@ namespace IT_ASSET.Services.NewFolder
                         status = ownerId != null ? "Released" : "New",
                         history = new List<string>(history), // Assign the same history data to each component
                         owner_id = ownerId,
-                        computer_id = computer.id // Set the computer_id foreign key
+                        computer_id = computer.id, // Set the computer_id foreign key
+                        uid = GenerateUID(lastUidIndex + 1) // Generate the next UID
                     };
 
+                    lastUidIndex++; // Increment the last UID index
+
                     _context.computer_components.Add(component);
-                    Console.WriteLine($"Adding {component.type}: {component.description}");
+                    Console.WriteLine($"Adding {component.type}: {component.description} with UID {component.uid}");
                 }
             }
 
@@ -296,7 +309,38 @@ namespace IT_ASSET.Services.NewFolder
             {
                 Console.WriteLine($"Error while saving: {ex.Message}");
             }
+
+            // Update the computer entity with the UIDs of components (RAM, SSD, HDD, GPU)
+            var components = await _context.computer_components
+                .Where(c => c.computer_id == computer.id && new[] { "RAM", "SSD", "HDD", "GPU" }.Contains(c.type))
+                .ToListAsync();
+
+            var ramComponent = components.FirstOrDefault(c => c.type == "RAM");
+            var ssdComponent = components.FirstOrDefault(c => c.type == "SSD");
+            var hddComponent = components.FirstOrDefault(c => c.type == "HDD");
+            var gpuComponent = components.FirstOrDefault(c => c.type == "GPU");
+
+            // Set the UIDs for the computer fields
+            computer.ram = ramComponent?.uid;
+            computer.ssd = ssdComponent?.uid;
+            computer.hdd = hddComponent?.uid;
+            computer.gpu = gpuComponent?.uid;
+
+            // Save the updated computer information with the UIDs
+            try
+            {
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Computer updated with UIDs successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while updating computer with UIDs: {ex.Message}");
+            }
         }
+
+
+
+
 
 
         private async Task LogAssetActionAsync(Asset asset, string action, int performedByUserId, string details)

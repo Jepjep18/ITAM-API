@@ -31,12 +31,12 @@ namespace IT_ASSET.Services.NewFolder
             var user = await _userService.FindOrCreateUserAsync(assetDto);
             if (user == null) throw new Exception("User not found or could not be created.");
 
-            var liDescription = GenerateLiDescription(assetDto);
+            var liDescription = GenerateLiDescription(assetDto);  // Generate the liDescription here
 
             var computerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
-    };
+            {
+                "CPU", "CPU CORE i7 10th GEN", "CPU INTEL CORE i5", "Laptop", "Laptop Macbook AIR, NB 15S-DUI537TU"
+            };
 
             try
             {
@@ -52,12 +52,13 @@ namespace IT_ASSET.Services.NewFolder
                     _context.computers.Add(computer);
                     await _context.SaveChangesAsync();
 
+                    // After saving the computer, store the components and assign UIDs
+                    await StoreInComputerComponentsAsync(assetDto, user, computer);
+
                     // Add log for the computer
                     await LogAssetActionAsync(computer, "Computer Added", user.id, $"Computer with barcode {computer.asset_barcode} added.");
 
                     await HandleUserAccountabilityListAsync(user, computer);
-
-                    await StoreInComputerComponentsAsync(assetDto, user);
 
                     return "Computer added successfully.";
                 }
@@ -102,6 +103,90 @@ namespace IT_ASSET.Services.NewFolder
         }
 
 
+        // Method to store components like RAM, SSD, etc., and assign UID values to them
+        private async Task StoreInComputerComponentsAsync(AddAssetDto assetDto, User user, Computer computer)
+        {
+            var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
+            var values = new string[] { assetDto.ram, assetDto.ssd, assetDto.hdd, assetDto.gpu };
+
+            // Fetch the last used UID from the computer_components table
+            var lastUid = await _context.computer_components
+                .OrderByDescending(c => c.id)
+                .FirstOrDefaultAsync();
+            int lastUidIndex = lastUid != null ? int.Parse(lastUid.uid.Split('-')[1]) : 0;
+
+            string GenerateUID(int uidIndex)
+            {
+                return $"UID-{uidIndex:D3}";
+            }
+
+            // Loop through the headers and values to create components
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var description = values[i];
+
+                // Only create a component if the description is not empty
+                if (!string.IsNullOrWhiteSpace(description))
+                {
+                    var component = new ComputerComponents
+                    {
+                        type = headers[i],
+                        description = description,
+                        asset_barcode = assetDto.asset_barcode,
+                        status = "New", // Assuming new status here, update if necessary
+                        owner_id = user.id,
+                        computer_id = computer.id, // Set the computer_id foreign key
+                        uid = GenerateUID(lastUidIndex + 1) // Generate the next UID
+                    };
+
+                    lastUidIndex++; // Increment the last UID index
+
+                    _context.computer_components.Add(component);
+                    Console.WriteLine($"Adding {component.type}: {component.description} with UID {component.uid}");
+                }
+            }
+
+            // Save the components to the database
+            try
+            {
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Components saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while saving components: {ex.Message}");
+            }
+
+            // Update the computer entity with the UIDs of components (RAM, SSD, HDD, GPU)
+            var components = await _context.computer_components
+                .Where(c => c.computer_id == computer.id && new[] { "RAM", "SSD", "HDD", "GPU" }.Contains(c.type))
+                .ToListAsync();
+
+            var ramComponent = components.FirstOrDefault(c => c.type == "RAM");
+            var ssdComponent = components.FirstOrDefault(c => c.type == "SSD");
+            var hddComponent = components.FirstOrDefault(c => c.type == "HDD");
+            var gpuComponent = components.FirstOrDefault(c => c.type == "GPU");
+
+            // Set the UIDs for the computer fields
+            computer.ram = ramComponent?.uid;
+            computer.ssd = ssdComponent?.uid;
+            computer.hdd = hddComponent?.uid;
+            computer.gpu = gpuComponent?.uid;
+
+            // Save the updated computer information with the UIDs
+            try
+            {
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Computer updated with component UIDs.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while updating computer with UIDs: {ex.Message}");
+            }
+        }
+
+
+
         private async Task LogAssetActionAsync(object asset, string action, int performedByUserId, string details)
         {
             if (asset is Asset)
@@ -136,78 +221,29 @@ namespace IT_ASSET.Services.NewFolder
 
 
 
-
-
-
-        public async Task StoreInComputerComponentsAsync(AddAssetDto assetDto, User user)
-        {
-            
-            var assetBarcode = assetDto.asset_barcode; 
-            var ownerId = user.id;
-
-            // Define headers that you want to store as 'type'
-            var headers = new string[] { "RAM", "SSD", "HDD", "GPU" };
-            var values = new string[]
-            {
-                assetDto.ram,  
-                assetDto.ssd,  
-                assetDto.hdd,  
-                assetDto.gpu   
-            };
-
-            
-            for (int i = 0; i < headers.Length; i++)
-            {
-                var description = values[i];
-
-                
-                if (!string.IsNullOrWhiteSpace(description))
-                {
-                    var component = new ComputerComponents
-                    {
-                        type = headers[i],
-                        description = description,
-                        asset_barcode = assetBarcode,
-                        status = ownerId != null ? "Released" : "New",
-                        history = new List<string>(), 
-                        owner_id = ownerId
-                    };
-
-                    _context.computer_components.Add(component);
-                    Console.WriteLine($"Adding {component.type}: {component.description}");
-
-                    
-                    await HandleUserAccountabilityListAsync(user, component);
-                }
-            }
-
-            try
-            {
-                await _context.SaveChangesAsync();
-                Console.WriteLine("Data saved successfully.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error while saving: {ex.Message}");
-            }
-        }
-
-
         private string GenerateLiDescription(AddAssetDto assetDto)
         {
-            var liDescription = string.Join(" ",
-                assetDto.brand?.Trim(),
-                assetDto.type?.Trim(),
-                assetDto.model?.Trim(),
-                assetDto.ram?.Trim(),
-                assetDto.ssd?.Trim(),
-                assetDto.hdd?.Trim(),
-                assetDto.gpu?.Trim(),
-                assetDto.size?.Trim(),
-                assetDto.color?.Trim()).Trim();
+            // Create an array of all the properties that make up the description
+            var descriptionParts = new[] {
+                assetDto.brand?.Trim(),    // Brand
+                assetDto.type?.Trim(),     // Type
+                assetDto.model?.Trim(),    // Model
+                assetDto.ram?.Trim(),      // RAM
+                assetDto.ssd?.Trim(),      // SSD
+                assetDto.hdd?.Trim(),      // HDD
+                assetDto.gpu?.Trim(),      // GPU
+                assetDto.size?.Trim(),     // Size
+                assetDto.color?.Trim()     // Color
+            };
 
+            // Filter out null or empty values and join the remaining parts
+            var liDescription = string.Join(" ", descriptionParts.Where(part => !string.IsNullOrWhiteSpace(part))).Trim();
+
+            // If the description is still empty after trimming, return a default message
             return string.IsNullOrWhiteSpace(liDescription) ? "No description available" : liDescription;
         }
+
+
 
         private async Task HandleUserAccountabilityListAsync(User user, object item)
         {
@@ -836,12 +872,11 @@ namespace IT_ASSET.Services.NewFolder
             };
         }
 
-        //for get all items endpoint 
-        public async Task<PaginatedResponse<Asset>> GetAllAssetsAsync(
-        int pageNumber = 1,
-        int pageSize = 10,
-        string sortOrder = "asc",
-        string? searchTerm = null)
+        public async Task<PaginatedResponse<AssetWithOwnerDTO>> GetAllAssetsAsync(
+    int pageNumber = 1,
+    int pageSize = 10,
+    string sortOrder = "asc",
+    string? searchTerm = null)
         {
             var query = _context.Assets.AsQueryable();
 
@@ -868,10 +903,45 @@ namespace IT_ASSET.Services.NewFolder
             var paginatedData = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
+                .Select(asset => new AssetWithOwnerDTO
+                {
+                    id = asset.id,
+                    type = asset.type,
+                    date_acquired = asset.date_acquired,
+                    asset_barcode = asset.asset_barcode,
+                    brand = asset.brand,
+                    model = asset.model,
+                    ram = asset.ram,
+                    ssd = asset.ssd,
+                    hdd = asset.hdd,
+                    gpu = asset.gpu,
+                    size = asset.size,
+                    color = asset.color,
+                    serial_no = asset.serial_no,
+                    po = asset.po,
+                    warranty = asset.warranty,
+                    cost = asset.cost,
+                    remarks = asset.remarks,
+                    li_description = asset.li_description,
+                    history = asset.history,
+                    asset_image = asset.asset_image,
+                    owner_id = asset.owner_id,
+                    is_deleted = asset.is_deleted,
+                    date_created = asset.date_created,
+                    date_modified = asset.date_modified,
+                    owner = asset.owner_id != null ? new OwnerDTO
+                    {
+                        id = asset.id,
+                        name = _context.Users.Where(u => u.id == asset.owner_id).Select(u => u.name).FirstOrDefault(),
+                        company = _context.Users.Where(u => u.id == asset.owner_id).Select(u => u.company).FirstOrDefault(),
+                        department = _context.Users.Where(u => u.id == asset.owner_id).Select(u => u.department).FirstOrDefault(),
+                        employee_id = _context.Users.Where(u => u.id == asset.owner_id).Select(u => u.employee_id).FirstOrDefault()
+                    } : null
+                })
                 .ToListAsync();
 
             // Return the paginated response
-            return new PaginatedResponse<Asset>
+            return new PaginatedResponse<AssetWithOwnerDTO>
             {
                 Items = paginatedData,
                 TotalItems = totalItems,
@@ -879,6 +949,7 @@ namespace IT_ASSET.Services.NewFolder
                 PageSize = pageSize
             };
         }
+
 
 
         //for get by id assets endpoint
@@ -932,6 +1003,53 @@ namespace IT_ASSET.Services.NewFolder
                 throw new Exception($"Error retrieving asset with ID {id}: {ex.Message}");
             }
         }
+
+
+        //for get by owner id endpoint
+        // Asset service to get assets based on owner id
+        public async Task<List<AssetWithOwnerDTO>> GetAssetsByOwnerIdAsync(int ownerId)
+        {
+            return await _context.Assets
+                .Where(a => a.owner_id == ownerId)
+                .Select(a => new AssetWithOwnerDTO
+                {
+                    id = a.id,
+                    type = a.type,
+                    date_acquired = a.date_acquired,
+                    asset_barcode = a.asset_barcode,
+                    brand = a.brand,
+                    model = a.model,
+                    ram = a.ram,
+                    ssd = a.ssd,
+                    hdd = a.hdd,
+                    gpu = a.gpu,
+                    size = a.size,
+                    color = a.color,
+                    serial_no = a.serial_no,
+                    po = a.po,
+                    warranty = a.warranty,
+                    cost = a.cost,
+                    remarks = a.remarks,
+                    li_description = a.li_description,
+                    history = a.history,
+                    asset_image = a.asset_image,
+                    owner_id = a.owner_id,
+                    is_deleted = a.is_deleted,
+                    date_created = a.date_created,
+                    date_modified = a.date_modified,
+                    owner = a.owner_id != null ? new OwnerDTO
+                    {
+                        id = a.id,
+                        name = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.name).FirstOrDefault(),
+                        company = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.company).FirstOrDefault(),
+                        department = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.department).FirstOrDefault(),
+                        employee_id = _context.Users.Where(u => u.id == a.owner_id).Select(u => u.employee_id).FirstOrDefault()
+                    } : null
+                })
+                .ToListAsync();
+        }
+
+
 
 
         public async Task<Asset> UpdateAssetAsync(int assetId, UpdateAssetDto assetDto, int ownerId, ClaimsPrincipal user)
